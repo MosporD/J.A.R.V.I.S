@@ -1,0 +1,17 @@
+/* =============================================================================
+   J.A.R.V.I.S. — STYLE ENTRY POINT
+   -----------------------------------------------------------------------------
+   Import order matters:
+     1. tailwindcss  — pulls in the preflight + utility engine
+     2. fonts        — self-hosted @font-face declarations
+     3. theme        — design tokens (@theme) -> becomes the Tailwind config
+     4. base         — substrate, ambient field, reduced-motion policy
+     5. components   — the reusable HUD chassis + custom @utility classes
+   ========================================================================== */
+
+@import "tailwindcss";
+
+@import "./fonts.css";
+@import "./theme.css";
+@import "./base.css";
+@import "./components.css";

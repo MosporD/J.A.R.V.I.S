@@ -1,0 +1,118 @@
+/* =============================================================================
+   J.A.R.V.I.S. — DESIGN TOKENS
+   -----------------------------------------------------------------------------
+   Tailwind v4 is configured in CSS. Every token declared inside `@theme` becomes
+   both a plain CSS custom property AND a generated utility class:
+
+     --color-hud     ->  bg-hud / text-hud / border-hud / from-hud  (+ /alpha)
+     --font-display  ->  font-display
+     --animate-sweep ->  animate-sweep
+     --shadow-hud    ->  shadow-hud
+     --ease-hud      ->  ease-hud
+
+   This file is the single source of truth for the visual language. Change a
+   value here and it propagates through the utilities, the component layer and
+   the canvas renderers alike (JS reads the same custom properties through
+   `token()` in src/core/theme.js).
+   ========================================================================== */
+
+@theme {
+  /* --- Substrate ---------------------------------------------------------- */
+  --color-void: #020408;      /* page floor — deep obsidian                   */
+  --color-abyss: #04070e;     /* panel floor                                  */
+  --color-hull: #070d18;      /* raised surface                               */
+  --color-plate: #0b1524;     /* inset wells, tracks, inputs                  */
+
+  /* --- Signal ------------------------------------------------------------- */
+  --color-hud: #00f3ff;       /* holographic cyan — primary accent            */
+  --color-arc: #0066ff;       /* electric blue — secondary / depth            */
+  --color-alert: #ff3300;     /* critical only — used sparingly               */
+  --color-caution: #ffb000;   /* degraded / warning tier                      */
+
+  /* --- Type --------------------------------------------------------------- */
+  --color-ink: #cbeaf7;       /* body copy — cyan-tinted white                */
+  --color-ink-dim: #7fa3b8;   /* secondary copy                               */
+  --color-ink-mute: #3f5f75;  /* labels, axis ticks, disabled                 */
+
+  --font-display: "Orbitron", "Eurostile", "Bank Gothic", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-hud: "Rajdhani", "DIN Alternate", "Roboto Condensed", ui-sans-serif, system-ui, sans-serif;
+
+  --text-micro: 0.5625rem;    /* 9px  — instrument labels                     */
+  --text-micro--line-height: 1.1;
+  --text-nano: 0.625rem;      /* 10px — chip text                             */
+  --text-nano--line-height: 1.2;
+
+  --tracking-hud: 0.18em;
+  --tracking-wide-hud: 0.32em;
+
+  /* --- Geometry ----------------------------------------------------------- */
+  --radius-hud: 2px;          /* the HUD is angular. corners are a whisper.   */
+  --radius-panel: 3px;
+
+  /* --- Depth & bloom ------------------------------------------------------ */
+  --shadow-hud: 0 0 0 1px color-mix(in srgb, var(--color-hud) 18%, transparent),
+                0 18px 48px -24px color-mix(in srgb, var(--color-arc) 55%, transparent),
+                inset 0 1px 0 0 color-mix(in srgb, var(--color-hud) 10%, transparent);
+  --shadow-hud-lift: 0 0 0 1px color-mix(in srgb, var(--color-hud) 38%, transparent),
+                     0 0 28px -6px color-mix(in srgb, var(--color-hud) 30%, transparent),
+                     0 24px 60px -28px color-mix(in srgb, var(--color-arc) 70%, transparent),
+                     inset 0 1px 0 0 color-mix(in srgb, var(--color-hud) 16%, transparent);
+  --shadow-alert: 0 0 0 1px color-mix(in srgb, var(--color-alert) 45%, transparent),
+                  0 0 32px -8px color-mix(in srgb, var(--color-alert) 45%, transparent);
+  --shadow-inset-well: inset 0 1px 12px -4px rgb(0 0 0 / 90%),
+                       inset 0 0 0 1px color-mix(in srgb, var(--color-hud) 12%, transparent);
+
+  /* --- Motion ------------------------------------------------------------- */
+  --ease-hud: cubic-bezier(0.16, 1, 0.3, 1);       /* decisive settle         */
+  --ease-snap: cubic-bezier(0.2, 0, 0, 1);         /* instrument snap         */
+
+  --animate-scan: scan 7s linear infinite;
+  --animate-sweep: sweep 3.2s var(--ease-hud) infinite;
+  --animate-breathe: breathe 4.5s ease-in-out infinite;
+  --animate-flicker: flicker 6s steps(1, end) infinite;
+  --animate-spin-slow: spin 26s linear infinite;
+  --animate-spin-slower: spin 52s linear infinite reverse;
+  --animate-blink: blink 1.05s steps(1, end) infinite;
+  --animate-rise: rise 0.42s var(--ease-hud) both;
+  --animate-alert-pulse: alert-pulse 1.1s ease-in-out infinite;
+}
+
+/* The keyframes referenced above. Kept beside the tokens that name them. */
+@keyframes scan {
+  0%   { transform: translate3d(0, -12vh, 0); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translate3d(0, 112vh, 0); opacity: 0; }
+}
+@keyframes sweep {
+  0%   { transform: translate3d(-110%, 0, 0); }
+  60%  { transform: translate3d(110%, 0, 0); }
+  100% { transform: translate3d(110%, 0, 0); }
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.035); }
+}
+@keyframes flicker {
+  0%, 96%, 100% { opacity: 1; }
+  97%           { opacity: 0.72; }
+  98%           { opacity: 1; }
+  99%           { opacity: 0.86; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes alert-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}

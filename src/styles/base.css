@@ -1,0 +1,191 @@
+/* =============================================================================
+   BASE — the substrate the HUD is projected onto.
+   ========================================================================== */
+
+@layer base {
+  /* Derived alphas. Declared once, consumed everywhere, so a palette change in
+     theme.css propagates into every border, fill and glow in the interface. */
+  :root {
+    --hud-line: color-mix(in srgb, var(--color-hud) 30%, transparent);
+    --hud-line-soft: color-mix(in srgb, var(--color-hud) 16%, transparent);
+    --hud-line-hot: color-mix(in srgb, var(--color-hud) 62%, transparent);
+    --hud-fill: color-mix(in srgb, var(--color-hud) 7%, transparent);
+    --arc-fill: color-mix(in srgb, var(--color-arc) 12%, transparent);
+    --glass: color-mix(in srgb, var(--color-abyss) 72%, transparent);
+
+    /* Accent is indirected so `theme` / `alert` commands can re-hue the whole
+       interface at runtime by writing a single property. */
+    --accent: var(--color-hud);
+
+    color-scheme: dark;
+    accent-color: var(--color-hud);
+  }
+
+  * {
+    min-width: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: var(--hud-line) transparent;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-hud);
+    font-feature-settings: "tnum" 1, "ss01" 1;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* Numeric readouts must never reflow as digits change. */
+  .tabular,
+  input,
+  output,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-hud) 32%, transparent);
+    color: #eaffff;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--hud-line-hot);
+    outline-offset: 2px;
+  }
+
+  /* Thin instrument scrollbars. */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--color-hud) 4%, transparent);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--hud-line);
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--hud-line-hot);
+  }
+
+  canvas {
+    display: block;
+  }
+
+  /* Anything the user has not yet earned the right to see. */
+  [hidden] {
+    display: none !important;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Ambient field — fixed, non-interactive, behind everything.
+   -------------------------------------------------------------------------- */
+@layer components {
+  .fx-field {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Engineering grid: 1px lines every 44px, heavier every 5th cell. */
+  .fx-grid {
+    position: absolute;
+    inset: -2px;
+    background-image:
+      linear-gradient(to right, var(--hud-line-soft) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--hud-line-soft) 1px, transparent 1px),
+      linear-gradient(to right, color-mix(in srgb, var(--color-arc) 10%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--color-arc) 10%, transparent) 1px, transparent 1px);
+    background-size: 220px 220px, 220px 220px, 44px 44px, 44px 44px;
+    opacity: 0.75;
+    mask-image: radial-gradient(ellipse 90% 75% at 50% 45%, #000 20%, transparent 100%);
+  }
+
+  /* Cold blue floor bloom + warm core bloom behind the reactor. */
+  .fx-bloom {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 55% 45% at 50% 52%, color-mix(in srgb, var(--color-arc) 16%, transparent), transparent 70%),
+      radial-gradient(ellipse 80% 50% at 50% 100%, color-mix(in srgb, var(--color-hud) 7%, transparent), transparent 70%);
+  }
+
+  /* CRT vignette — pulls the eye to the core. */
+  .fx-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 78% 68% at 50% 48%, transparent 40%, rgb(0 0 0 / 72%) 100%);
+  }
+
+  /* Travelling scan bar. */
+  .fx-scanline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 18vh;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in srgb, var(--color-hud) 5%, transparent) 45%,
+      color-mix(in srgb, var(--color-hud) 9%, transparent) 50%,
+      transparent
+    );
+    animation: var(--animate-scan);
+  }
+
+  /* Static CRT raster — 3px repeating darkening. */
+  .fx-raster {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 22%) 0px,
+      rgb(0 0 0 / 22%) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    opacity: 0.5;
+    mix-blend-mode: multiply;
+  }
+
+  /* Film grain, generated — no asset request. */
+  .fx-noise {
+    position: absolute;
+    inset: -50%;
+    background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>\
+<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/>\
+</filter><rect width='160' height='160' filter='url(%23n)' opacity='0.42'/></svg>");
+    opacity: 0.035;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Reduced motion — the HUD holds still, but stays legible and functional.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .fx-scanline,
+  .fx-noise {
+    display: none;
+  }
+}

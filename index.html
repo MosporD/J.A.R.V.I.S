@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#020408" />
+    <meta
+      name="description"
+      content="J.A.R.V.I.S. — a holographic command dashboard with live system diagnostics, a reactive audio visualiser and a terminal command interface."
+    />
+    <title>J.A.R.V.I.S. // Command Interface</title>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Typefaces are self-hosted (see src/styles/fonts.css): the dashboard
+         renders correctly with no network access at all. -->
+    <link rel="preload" href="/fonts/share-tech-mono-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/orbitron-400-900.woff2" as="font" type="font/woff2" crossorigin />
+
+    <script type="module" src="/src/main.js"></script>
+  </head>
+
+  <body>
+    <!-- ══ AMBIENT FIELD ══ purely decorative, never interactive ══════════ -->
+    <div class="fx-field" aria-hidden="true">
+      <div class="fx-grid"></div>
+      <div class="fx-bloom"></div>
+      <div class="fx-scanline"></div>
+      <div class="fx-raster"></div>
+      <div class="fx-noise"></div>
+      <div class="fx-vignette"></div>
+    </div>
+
+    <!-- ══ BOOT SEQUENCE ═══════════════════════════════════════════════ -->
+    <div id="boot" class="boot" data-done="false" role="status" aria-live="polite">
+      <div class="w-[min(560px,88vw)] px-6">
+        <div class="mb-6 text-center">
+          <div class="font-display text-[2.6rem] font-black leading-none tracking-[0.2em] text-hud text-glow">
+            J.A.R.V.I.S.
+          </div>
+          <div class="label-hud mt-2 tracking-[0.34em]">
+            JUST A RATHER VERY INTELLIGENT SYSTEM
+          </div>
+        </div>
+
+        <div class="space-y-1.5" data-boot-lines></div>
+
+        <div class="mt-6">
+          <div class="mb-1.5 flex items-baseline justify-between">
+            <span class="label-hud">INITIALISING</span>
+            <span class="font-mono text-[0.6875rem] text-hud tabular" data-boot-pct>0%</span>
+          </div>
+          <div class="meter-track h-[3px]">
+            <div class="meter-fill" data-boot-bar style="width: 0%"></div>
+          </div>
+          <div class="mt-3 flex items-center justify-between">
+            <span class="label-hud">SERIAL <span data-boot-serial>——</span></span>
+            <span class="label-hud animate-breathe">PRESS ANY KEY TO SKIP</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ INTERFACE ═══════════════════════════════════════════════════ -->
+    <!-- On a large display the HUD is sized to the viewport and each column
+         scrolls inside itself, so the command prompt is always reachable.
+         Below xl it becomes an ordinary stacked, scrolling page. -->
+    <div class="layer-hud mx-auto flex min-h-dvh max-w-[1760px] flex-col gap-2.5 p-2.5 sm:gap-3 sm:p-3 xl:h-dvh xl:min-h-0 xl:p-4">
+
+      <!-- ── TOP RAIL ────────────────────────────────────────────────── -->
+      <header
+        id="statusbar"
+        class="panel panel-cut flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2 sm:px-4"
+      >
+        <div class="flex items-center gap-2.5">
+          <svg viewBox="0 0 40 40" class="h-7 w-7 shrink-0 text-hud" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1" />
+            <circle cx="20" cy="20" r="13" fill="none" stroke="currentColor" stroke-opacity=".6" stroke-width="1.2"
+                    stroke-dasharray="42 14" class="origin-center animate-spin-slow" />
+            <circle cx="20" cy="20" r="7.5" fill="none" stroke="currentColor" stroke-width="1.4" />
+            <circle cx="20" cy="20" r="3" fill="currentColor" class="animate-breathe origin-center" />
+          </svg>
+
+          <div class="leading-none">
+            <h1 class="font-display text-sm font-black tracking-[0.24em] text-hud text-glow">
+              J.A.R.V.I.S.
+            </h1>
+            <p class="label-hud mt-1 hidden sm:block">MARK VII · COMMAND INTERFACE</p>
+          </div>
+        </div>
+
+        <div class="mx-1 hidden h-7 w-px bg-hud/20 sm:block"></div>
+
+        <div class="chip" data-tone="ok">
+          <span class="led" data-mode-led data-tone="idle"></span>
+          <span data-mode>STANDBY</span>
+        </div>
+
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <span class="chip" data-link data-tone="ok">UPLINK OK</span>
+          <span class="hidden font-mono text-nano tracking-[0.14em] text-ink-mute sm:inline" data-fps>60 FPS</span>
+
+          <div class="hidden text-right sm:block">
+            <div class="label-hud">UPTIME</div>
+            <div class="font-mono text-[0.6875rem] text-ink-dim tabular" data-uptime>00:00:00</div>
+          </div>
+
+          <div class="text-right">
+            <div class="label-hud">LOCAL</div>
+            <div class="font-mono text-xs text-hud text-glow-soft tabular" data-clock>--:--:--</div>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button class="btn-hud" type="button" data-toggle="sfx" aria-pressed="true" title="Interface audio cues">
+              SFX
+            </button>
+            <button class="btn-hud" type="button" data-toggle="voice" aria-pressed="true" title="Spoken responses">
+              VOX
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ── MAIN GRID ───────────────────────────────────────────────── -->
+      <main class="grid flex-1 gap-2.5 sm:gap-3 lg:grid-cols-12 xl:min-h-0">
+
+        <!-- ▸ PORT COLUMN — diagnostics -->
+        <div class="order-2 flex flex-col gap-2.5 sm:gap-3 lg:order-1 lg:col-span-4 xl:col-span-3 xl:min-h-0 xl:overflow-y-auto xl:pr-1 2xl:-translate-y-1">
+          <section class="panel panel-bracket flex flex-1 flex-col" aria-labelledby="diag-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="diag-title">System Diagnostics</h2>
+              <span class="panel-index ml-auto">01 / SYS</span>
+            </div>
+            <div class="panel-body flex flex-1 flex-col" id="diagnostics"></div>
+          </section>
+
+
+        </div>
+
+        <!-- ▸ CORE — the reactor and the voice -->
+        <div class="order-1 flex flex-col gap-2.5 sm:gap-3 lg:order-2 lg:col-span-8 xl:col-span-6 xl:min-h-0">
+          <section
+            class="panel panel-bracket relative flex min-h-64 flex-1 items-center justify-center overflow-hidden"
+            aria-labelledby="core-title"
+          >
+            <h2 class="sr-hud" id="core-title">Artificial intelligence core status</h2>
+
+            <!-- Corner telemetry, framing the core -->
+            <div class="pointer-events-none absolute left-3 top-3 space-y-0.5">
+              <div class="label-hud">REACTOR</div>
+              <div class="font-mono text-xs text-hud text-glow-soft tabular" id="core-value">92%</div>
+            </div>
+            <div class="pointer-events-none absolute right-3 top-3 space-y-0.5 text-right">
+              <div class="label-hud">STATE</div>
+              <div class="font-display text-xs font-bold tracking-[0.18em] text-hud text-glow" id="core-state">
+                STANDBY
+              </div>
+            </div>
+            <div class="pointer-events-none absolute bottom-3 left-3 label-hud">
+              MARK VII · REPULSOR TECH
+            </div>
+            <div class="threat-badge pointer-events-none absolute bottom-3 right-3" id="threat-state" data-tone="ok">
+              NOMINAL
+            </div>
+
+            <div id="core" class="relative aspect-square w-[min(100%,26rem)] max-h-full p-3">
+              <canvas class="h-full w-full cursor-pointer" aria-hidden="true"></canvas>
+            </div>
+          </section>
+
+          <section class="panel panel-bracket" aria-labelledby="wave-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="wave-title">Voice Envelope</h2>
+              <span class="panel-index ml-auto" id="wave-label">SILENT</span>
+            </div>
+            <div class="panel-body pt-2">
+              <div id="waveform" class="h-24 w-full sm:h-28">
+                <canvas class="h-full w-full" aria-hidden="true"></canvas>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ▸ STARBOARD COLUMN — position and anomalies -->
+        <div class="order-3 grid gap-2.5 sm:gap-3 lg:col-span-12 lg:grid-cols-2 xl:col-span-3 xl:min-h-0 xl:grid-cols-1 xl:grid-rows-[auto_minmax(0,1fr)] xl:overflow-y-auto xl:pl-1 2xl:translate-y-1">
+          <section class="panel panel-bracket" aria-labelledby="clock-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="clock-title">Chronometer / Position</h2>
+              <span class="panel-index ml-auto">03 / GEO</span>
+            </div>
+            <div class="panel-body" id="worldclock"></div>
+          </section>
+
+          <section class="panel panel-bracket flex min-h-0 flex-col" aria-labelledby="alerts-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="alerts-title">Anomaly Register</h2>
+              <span class="panel-index ml-auto">04 / SEC</span>
+            </div>
+            <div class="panel-body flex min-h-0 flex-1 flex-col" id="alerts">
+              <ul class="min-h-0 flex-1 space-y-0 overflow-y-auto pr-1" data-alert-list></ul>
+              <div class="mt-auto shrink-0 border-t border-hud/10 pt-2">
+                <div class="label-hud mb-1">MONITORED VECTORS</div>
+                <div data-watchlist></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- ── TERMINAL DECK ───────────────────────────────────────────── -->
+      <footer class="grid gap-2.5 sm:gap-3 lg:grid-cols-12">
+        <section
+          class="panel panel-bracket flex h-56 flex-col lg:col-span-8 xl:col-span-6 xl:h-64"
+          id="logs"
+          data-pinned="true"
+          aria-labelledby="log-title"
+        >
+          <div class="panel-head">
+            <span class="led" data-tone="ok"></span>
+            <h2 class="panel-title" id="log-title">Event Stream</h2>
+            <div class="ml-auto flex items-center gap-1.5">
+              <button class="btn-hud" type="button" data-filter="all" aria-pressed="true">ALL</button>
+              <button class="btn-hud" type="button" data-filter="dialogue" aria-pressed="false">DIALOGUE</button>
+              <button class="btn-hud" type="button" data-filter="alerts" aria-pressed="false">ALERTS</button>
+              <span class="panel-index ml-1 tabular" data-log-count>0000</span>
+            </div>
+          </div>
+          <div
+            class="terminal min-h-0 flex-1 overflow-y-auto px-3 py-2"
+            data-log-stream
+            role="log"
+            aria-live="polite"
+            aria-label="Event stream"
+          ></div>
+        </section>
+
+        <section class="panel panel-bracket flex flex-col lg:col-span-4 xl:col-span-3" aria-labelledby="power-title">
+          <div class="panel-head">
+            <span class="led" data-tone="ok"></span>
+            <h2 class="panel-title" id="power-title">Power Distribution</h2>
+            <span class="panel-index ml-auto">06 / PWR</span>
+          </div>
+          <div class="panel-body flex flex-1 flex-col justify-center" id="power"></div>
+        </section>
+
+        <section class="panel panel-bracket flex flex-col lg:col-span-12 xl:col-span-3" aria-labelledby="actions-title">
+          <div class="panel-head">
+            <span class="led" data-tone="ok"></span>
+            <h2 class="panel-title" id="actions-title">Directives</h2>
+            <span class="panel-index ml-auto">05 / CMD</span>
+          </div>
+          <div class="panel-body grid flex-1 grid-cols-2 content-center gap-1.5 lg:grid-cols-6 xl:grid-cols-2" id="actions">
+            <button class="btn-hud" type="button" data-command="status">STATUS</button>
+            <button class="btn-hud" type="button" data-command="diag">DIAGNOSE</button>
+            <button class="btn-hud" type="button" data-command="scan">SCAN</button>
+            <button class="btn-hud" type="button" data-command="locate">LOCATE</button>
+            <button class="btn-hud" type="button" data-command="mic on">LISTEN</button>
+            <button class="btn-hud" type="button" data-command="clear">PURGE</button>
+          </div>
+        </section>
+
+        <!-- Command prompt -->
+        <div class="lg:col-span-12">
+          <form class="prompt" id="command" autocomplete="off" novalidate>
+            <span class="prompt-label" aria-hidden="true">JARVIS &gt;</span>
+            <label class="sr-hud" for="command-input">Command input</label>
+            <div class="relative flex flex-1 items-center">
+              <span class="prompt-ghost" data-ghost aria-hidden="true"></span>
+              <input
+                id="command-input"
+                class="prompt-input relative bg-transparent"
+                type="text"
+                name="command"
+                placeholder="type a directive, or “help”…"
+                spellcheck="false"
+                autocapitalize="off"
+                autocorrect="off"
+              />
+              <span class="caret pointer-events-none absolute left-0" data-caret aria-hidden="true"></span>
+            </div>
+            <span class="hidden shrink-0 font-mono text-nano tracking-[0.12em] text-ink-mute lg:inline" data-hint></span>
+            <button class="btn-hud shrink-0" type="submit">EXECUTE</button>
+          </form>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
