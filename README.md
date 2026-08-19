@@ -135,6 +135,12 @@ Where a figure is unavailable the panel prints `N/D` rather than inventing one.
 - **Speech is optional.** The amplitude envelope is driven by the text, not by
   the synthesiser, so the visualiser behaves identically on a machine with no
   installed voices — or with `voice off`.
+- **The viewport fit is conditional.** On a display at least 960px tall the
+  shell is sized to the viewport, the columns scroll inside themselves and the
+  prompt stays anchored. Below that the page becomes an ordinary scrolling
+  document rather than squeezing panels past legibility — an honest scrollbar
+  beats a panel sliced in half. See the height budget at the end of
+  `components.css`.
 - **`prefers-reduced-motion` is honoured**: the ambient scan and grain are
   removed, animations collapse, the boot sequence prints instantly and the
   typewriter effect is skipped. Everything stays legible and functional.

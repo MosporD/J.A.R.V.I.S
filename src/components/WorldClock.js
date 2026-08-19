@@ -39,7 +39,7 @@ export class WorldClock extends Component {
         </div>
       </div>
 
-      <div class="relative mx-auto mt-3 aspect-square w-[min(100%,14rem)]">
+      <div class="relative mx-auto mt-3 aspect-square w-[min(100%,14rem)]" id="radar-frame">
         <canvas data-radar class="absolute inset-0 h-full w-full"></canvas>
         <div class="pointer-events-none absolute inset-x-0 bottom-1 text-center label-hud" data-fix>
           GRID REF · UNFIXED
