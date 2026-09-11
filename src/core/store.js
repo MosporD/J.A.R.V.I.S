@@ -20,6 +20,7 @@ const state = {
   sfx: true,
   mic: false,
   voice: true,
+  narrate: 'alerts',      // off | alerts | all — what the log reads aloud
   reduceMotion: false,
   threat: 'nominal',      // nominal | elevated | critical
   reactor: 92,            // core output %

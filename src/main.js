@@ -5,7 +5,9 @@ import { store } from './core/store.js';
 import { telemetry } from './core/telemetry.js';
 import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
+import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
+import { narrator } from './core/narrator.js';
 import { prefersReducedMotion } from './core/ticker.js';
 import { sigil } from './core/format.js';
 
@@ -20,6 +22,7 @@ import { AlertsPanel, ThreatBadge } from './components/AlertsPanel.js';
 import { LogStream } from './components/LogStream.js';
 import { CommandBar } from './components/CommandBar.js';
 import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
+import { NarrateToggle } from './components/NarrateToggle.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -47,6 +50,7 @@ const dashboard = [
   new ThreatBadge('#threat-state'),
   new ForgePanel('#forge'),
   new ForgeLink('#forge-link'),
+  new NarrateToggle('#narrate-toggle'),
   new CommandBar('#command'),
   new BootSequence('#boot'),       // last: it greets once everything is live
 ];
@@ -90,6 +94,7 @@ function start() {
   // Optional by design: the workshop runs whether or not the pipeline is up,
   // so this backs off quietly instead of retrying a dead port forever.
   forge.start();
+  narrator.start();
   bindInterfaceSounds();
   bindQuickActions();
   bindAmbientLog();
@@ -121,7 +126,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, audio, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, execute, dashboard };
 }
 
 if (document.readyState === 'loading') {
