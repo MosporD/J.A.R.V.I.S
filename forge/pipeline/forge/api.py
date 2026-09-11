@@ -17,12 +17,32 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from . import db, stages
+from .config import _env
 from .providers import ProviderError, describe
 
 app = FastAPI(title="forge", version="1.0.0")
+
+# The J.A.R.V.I.S dashboard is a separate origin — Vite serves it on :5173 while
+# this runs on :8000 — so without these headers the browser drops every reply
+# before the panel sees it, silently and with no server-side error to find.
+# Kept to an explicit list rather than "*" because the stage endpoints are not
+# read-only.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        origin for origin in _env(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:4173,http://127.0.0.1:4173",
+        ).split(",") if origin
+    ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 
 # --- Request bodies ---------------------------------------------------------
