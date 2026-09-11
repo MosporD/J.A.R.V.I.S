@@ -5,7 +5,9 @@ diagnostics, a reactive audio visualiser, a world clock with a position radar,
 and a terminal you can actually talk to.
 
 Built with **Vite 8**, **Tailwind CSS v4** and plain ES modules — no UI
-framework, no runtime dependencies, no external network calls.
+framework, no runtime dependencies. The only network call it ever makes is to
+your own content pipeline (`forge/`), and the interface runs unchanged when
+that is not there.
 
 ```bash
 npm install
@@ -39,6 +41,7 @@ directive keys in the bottom-right panel.
 | `say <text>`           | Speak a line, driving the waveform and core bloom          |
 | `mic on` / `mic off`   | Microphone-reactive visualiser (asks permission)           |
 | `sfx` / `voice`        | Toggle interface cues and spoken replies                   |
+| `forge`                | Content pipeline status — buffer, stages, link             |
 | `boot`                 | Replay the start-up sequence                               |
 | `clear`                | Purge the log                                              |
 
@@ -73,10 +76,13 @@ src/
     audio.js            synthesised cues + the analyser the waveform reads
     speech.js           TTS wrapper and the amplitude envelope
     commands.js         command registry, parser, and the conversational fallback
+    forge.js            polls the content pipeline; backs off when it is absent
     canvas.js           DPR sizing, grids, area traces
     theme.js            bridge from CSS custom properties to canvas colours
     format.js           time, byte, coordinate and easing helpers
   components/           one file per panel; each extends Component
+forge/                  the content pipeline this dashboard fronts — its own
+                        service: schema, providers, render worker, API, n8n
 ```
 
 Three rules keep it modular:

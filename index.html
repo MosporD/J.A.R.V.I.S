@@ -126,7 +126,7 @@
       <main class="grid flex-1 gap-2.5 sm:gap-3 lg:grid-cols-12 xl:min-h-0">
 
         <!-- ▸ PORT COLUMN — diagnostics -->
-        <div class="hud-col order-2 flex flex-col gap-2.5 sm:gap-3 lg:order-1 lg:col-span-4 xl:col-span-3 xl:min-h-0 xl:overflow-y-auto xl:pr-1 2xl:-translate-y-1">
+        <div class="hud-col order-2 flex flex-col gap-2.5 sm:gap-3 lg:order-1 lg:col-span-4 xl:col-span-3 xl:grid xl:min-h-0 xl:grid-rows-[minmax(min-content,1fr)_auto] xl:overflow-y-auto xl:pr-1 2xl:-translate-y-1">
           <section class="panel panel-bracket flex flex-1 flex-col" aria-labelledby="diag-title">
             <div class="panel-head">
               <span class="led" data-tone="ok"></span>
@@ -136,7 +136,14 @@
             <div class="panel-body flex flex-1 flex-col" id="diagnostics"></div>
           </section>
 
-
+          <section class="panel panel-bracket shrink-0" aria-labelledby="forge-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="forge-title">Content Foundry</h2>
+              <span class="panel-index ml-auto" id="forge-link" data-tone="idle">OFFLINE</span>
+            </div>
+            <div class="panel-body" id="forge"></div>
+          </section>
         </div>
 
         <!-- ▸ CORE — the reactor and the voice -->

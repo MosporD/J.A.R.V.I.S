@@ -1,0 +1,132 @@
+{
+  "name": "forge \u00b7 publish due",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "1dd52808-c738-416b-991f-09a78c86608a",
+      "name": "Every 10 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://forge-api:8000/publish",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ limit: 5 }) }}"
+      },
+      "id": "33b2653e-d6ce-45e2-a92c-a8205ca3dd67",
+      "name": "Publish due",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.posted }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "4ab1918c-1087-4259-af30-79d0b7e0c8f2",
+      "name": "Anything posted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Quiet on an empty run: a notification every ten minutes saying nothing\n// happened trains you to ignore the one that matters.\nreturn [{ json: { posted: $json.posted, details: $json.details } }];"
+      },
+      "id": "750728d7-cb12-439c-a577-44e0533e87ee",
+      "name": "Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Every 10 min": {
+      "main": [
+        [
+          {
+            "node": "Publish due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish due": {
+      "main": [
+        [
+          {
+            "node": "Anything posted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything posted?": {
+      "main": [
+        [
+          {
+            "node": "Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

@@ -1,0 +1,5 @@
+# A render-only box. Deliberately short: the render worker imports no database
+# driver and no cloud SDK, so CPU for encoding can be added on a cheap machine
+# without carrying the rest of the stack. See providers/__init__.py for the
+# lazy-import rule that keeps this true.
+httpx==0.28.1

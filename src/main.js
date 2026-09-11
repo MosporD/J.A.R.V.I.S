@@ -5,6 +5,7 @@ import { store } from './core/store.js';
 import { telemetry } from './core/telemetry.js';
 import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
+import { forge } from './core/forge.js';
 import { prefersReducedMotion } from './core/ticker.js';
 import { sigil } from './core/format.js';
 
@@ -18,6 +19,7 @@ import { PowerGrid } from './components/PowerGrid.js';
 import { AlertsPanel, ThreatBadge } from './components/AlertsPanel.js';
 import { LogStream } from './components/LogStream.js';
 import { CommandBar } from './components/CommandBar.js';
+import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -43,6 +45,8 @@ const dashboard = [
   new WorldClock('#worldclock'),
   new AlertsPanel('#alerts'),
   new ThreatBadge('#threat-state'),
+  new ForgePanel('#forge'),
+  new ForgeLink('#forge-link'),
   new CommandBar('#command'),
   new BootSequence('#boot'),       // last: it greets once everything is live
 ];
@@ -83,6 +87,9 @@ function bindAmbientLog() {
 
 function start() {
   telemetry.start();
+  // Optional by design: the workshop runs whether or not the pipeline is up,
+  // so this backs off quietly instead of retrying a dead port forever.
+  forge.start();
   bindInterfaceSounds();
   bindQuickActions();
   bindAmbientLog();
@@ -114,7 +121,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, audio, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, audio, execute, dashboard };
 }
 
 if (document.readyState === 'loading') {
