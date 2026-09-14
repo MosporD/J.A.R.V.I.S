@@ -17,6 +17,7 @@ history, append to it.
 | Automated CI | ❌ none configured on this repo |
 | Test suites | manual, headless Chromium — 83/83 passing |
 | Diff vs base | 21 files, +1575 / −55, 9 commits |
+| 3D core fidelity | ✅ rebuilt against the 2D drawing list — 9/9 render checks |
 | Merge conflicts | none — branch is current with its base |
 | Stuck-boot symptom | ✅ **cleared on the operator's Windows hardware** (confirmed 2026-09-14) |
 
@@ -85,6 +86,23 @@ Symptom: dashboard frozen on `INITIALISING 0%` forever.
 
 **New modules:** `src/core/{storage,webgl,hotkeys,dictation,cast}.js` ·
 `src/components/{ArcCore3D,ListenToggle,CastPanel}.js`
+
+### The 3D core, rebuilt
+
+The first 3D core was a weaker instrument wearing a WebGL badge. It kept the
+state bindings and threw away the visual language: four full torus rings where
+the flat core draws four arc segments of unequal length, 36 uniform ticks where
+it draws 120 with every tenth major, and no dashed ring, brackets, orbiters,
+containment rings or leading markers at all. The dual-pass glow — a wide
+translucent stroke under a thin bright one, which is what makes the flat core
+read as lit — was never ported, and an icosahedron wireframe appeared that
+exists nowhere in the 2D.
+
+It is now the flat core's drawing list rebuilt as geometry, at the same radii,
+in the same order, with stroke widths measured against the real panel size
+rather than guessed. Depth is the only addition: the segments sit on slightly
+separated planes, the orbiters run on genuinely inclined orbits instead of
+squashed ellipses, and the assembly leans towards the pointer.
 **New deps:** `three@^0.186.0`, `qrcode-generator@^2.0.4`
 
 ---
@@ -155,11 +173,22 @@ session's local work. **Don't drop it without checking first.**
 | hotkeys | 10/10 |
 | voice | 28/28 |
 | cast | 20/20 |
-| **total** | **83/83** |
+| 3D core render | 9/9 |
+| **total** | **92/92** |
 
 ---
 
 ## Update log
+
+- **2026-09-14** — Rebuilt the 3D reactor core against the 2D renderer as the
+  reference. Corrected four defects found by rendering it and looking: stroke
+  widths were 2x too thick (the pixel-to-world scale was measured against half
+  the real panel size), two of the three containment rings were turned edge-on
+  and collapsed into straight lines across the middle of the reactor, the
+  reactor triangle pointed right instead of up, and the camera sat far enough
+  back that the whole instrument rendered small inside its panel. Hardened
+  teardown: `sweep()` replaces arc geometry as telemetry moves, so the
+  ownership list no longer held what was live at destroy time.
 
 - **2026-09-14** — Operator confirmed the stuck-boot symptom is cleared on their
   own Windows hardware. All three causes closed; the original defect is
