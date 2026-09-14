@@ -81,7 +81,7 @@ export class CommandBar extends Component {
   renderHint() {
     if (!this.hint) return;
     const known = new Set(catalogue().map((c) => c.name));
-    const suggested = ['status', 'diag', 'scan', 'locate', 'theme', 'say']
+    const suggested = ['status', 'diag', 'scan', 'locate', 'email', 'say']
       .filter((name) => known.has(name));
     this.hint.textContent = `TRY · ${suggested.join(' · ')}`;
   }
