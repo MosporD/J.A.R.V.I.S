@@ -331,12 +331,19 @@ register({
 
 register({
   name: 'theme',
-  summary: `Re-hue the interface — ${Object.keys(THEMES).join(' | ')}.`,
+  summary: `Re-hue the interface — ${Object.keys(THEMES).join(' | ')} | next.`,
   run(args) {
-    const name = (args[0] || '').toLowerCase();
+    const names = Object.keys(THEMES);
+    let name = (args[0] || '').toLowerCase();
+    // `next` walks the list, so the palette can live on a single keystroke.
+    if (name === 'next' || name === 'cycle') {
+      const current = document.documentElement.style.getPropertyValue('--color-hud').trim();
+      const index = names.findIndex((key) => THEMES[key].hud === current);
+      name = names[(index + 1) % names.length];
+    }
     const preset = THEMES[name];
     if (!preset) {
-      log(`Available palettes: ${Object.keys(THEMES).join(', ')}`, 'sys', 'theme');
+      log(`Available palettes: ${names.join(', ')}, next`, 'sys', 'theme');
       return Promise.resolve();
     }
     const root = document.documentElement;

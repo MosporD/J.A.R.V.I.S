@@ -5,6 +5,7 @@ import { store } from './core/store.js';
 import { telemetry } from './core/telemetry.js';
 import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
+import { startHotkeys } from './core/hotkeys.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
 import { narrator } from './core/narrator.js';
@@ -193,6 +194,7 @@ function start() {
   step('Interface audio', () => bindInterfaceSounds());
   step('Quick actions', () => bindQuickActions());
   step('Ambient log', () => bindAmbientLog());
+  step('Keyboard shortcuts', () => startHotkeys());
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
 
   dashboard.forEach(mountSafely);
@@ -200,7 +202,7 @@ function start() {
   upgradeCore();
 
   bus.emit('log', { level: 'sys', tag: 'kernel', text: `Session ${sigil()} opened.` });
-  bus.emit('log', { level: 'sys', tag: 'kernel', text: 'Type "help" for the directive index. Press "/" to focus the prompt.' });
+  bus.emit('log', { level: 'sys', tag: 'kernel', text: 'Type "help" for the directive index, "keys" for shortcuts. Press "/" to focus the prompt.' });
 
   if (prefersReducedMotion) {
     bus.emit('log', {
