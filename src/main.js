@@ -14,6 +14,7 @@ import { sigil } from './core/format.js';
 import { Readout } from './core/component.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ArcCore, coreStateLabel } from './components/ArcCore.js';
+import { supportsWebGL } from './core/webgl.js';
 import { Waveform } from './components/Waveform.js';
 import { Diagnostics } from './components/Diagnostics.js';
 import { WorldClock } from './components/WorldClock.js';
@@ -41,7 +42,7 @@ const dashboard = [
   new StatusBar('#statusbar'),
   new Diagnostics('#diagnostics'),
   new PowerGrid('#power'),
-  new ArcCore('#core'),
+  new ArcCore('#core'),            // upgraded to the 3D core below, if it loads
   new Readout('#core-state', {
     keys: ['mode', 'threat'],
     text: (s) => coreStateLabel(s.get('mode'), s.get('threat')),
@@ -79,6 +80,58 @@ function mountSafely(component) {
       text: `Panel "${id}" failed to initialise — ${error.message}`,
     });
   }
+}
+
+/**
+ * Replace whatever is currently drawing the core.
+ *
+ * A canvas keeps the first context type it is given, so swapping between a 2D
+ * and a WebGL core means replacing the element, not just the component.
+ */
+function swapCore(build) {
+  const host = document.querySelector('#core');
+  const stale = host?.querySelector('canvas');
+  const index = dashboard.findIndex((component) => component.el === host);
+  if (!host || !stale || index === -1) return false;
+
+  dashboard[index].destroy();
+  const fresh = document.createElement('canvas');
+  fresh.className = stale.className;
+  fresh.setAttribute('aria-hidden', 'true');
+  stale.replaceWith(fresh);
+  dashboard[index] = build();
+  mountSafely(dashboard[index]);
+  return dashboard[index].mounted;
+}
+
+/**
+ * Load the 3D core in the background and swap it in once it arrives.
+ *
+ * Three.js is by far the largest thing this page can pull, so it is not allowed
+ * to sit between the operator and a working dashboard: the flat core mounts
+ * immediately and the 3D one replaces it only if the machine can render it and
+ * the chunk actually loads. A blocked CDN, a proxy, or no GPU all end the same
+ * way — the flat core, already on screen, simply stays.
+ */
+async function upgradeCore() {
+  if (!supportsWebGL()) {
+    bus.emit('log', { level: 'sys', tag: 'core', text: 'No WebGL on this display — flat core retained.' });
+    return;
+  }
+  try {
+    const { ArcCore3D } = await import('./components/ArcCore3D.js');
+    if (swapCore(() => new ArcCore3D('#core'))) {
+      bus.emit('log', { level: 'ok', tag: 'core', text: 'Reactor housing rendered in three dimensions.' });
+    }
+  } catch (error) {
+    console.error('[core] 3D upgrade failed', error);
+    bus.emit('log', { level: 'warn', tag: 'core', text: `3D core unavailable — ${error.message}` });
+  }
+}
+
+/** Losing the GPU mid-session must not cost the core. */
+function bindCoreFallback() {
+  bus.on('core:fallback', () => swapCore(() => new ArcCore('#core')));
 }
 
 /** Buttons that simply dispatch a directive. */
@@ -143,6 +196,8 @@ function start() {
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
 
   dashboard.forEach(mountSafely);
+  bindCoreFallback();
+  upgradeCore();
 
   bus.emit('log', { level: 'sys', tag: 'kernel', text: `Session ${sigil()} opened.` });
   bus.emit('log', { level: 'sys', tag: 'kernel', text: 'Type "help" for the directive index. Press "/" to focus the prompt.' });
