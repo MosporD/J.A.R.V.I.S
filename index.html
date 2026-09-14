@@ -142,6 +142,36 @@
       </div>
     </div>
 
+    <!-- ══ CAST OVERLAY ════════════════════════════════════════════════ -->
+    <div id="cast" class="cast-overlay" data-open="false" role="dialog" aria-modal="true"
+         aria-labelledby="cast-title" hidden>
+      <div class="cast-card">
+        <div class="panel-head">
+          <span class="led" data-tone="ok"></span>
+          <h2 class="panel-title" id="cast-title">Cast Interface</h2>
+          <button class="btn-hud ml-auto" type="button" data-cast-dismiss aria-label="Close">CLOSE</button>
+        </div>
+
+        <div class="panel-body grid gap-4 sm:grid-cols-[auto_1fr]">
+          <div class="cast-qr mx-auto text-hud" data-cast-qr></div>
+
+          <div class="min-w-0">
+            <div class="label-hud">ADDRESS</div>
+            <div class="mt-1 break-all font-mono text-[0.75rem] text-ink" data-cast-url>—</div>
+
+            <p class="mt-3 font-mono text-[0.6875rem] leading-relaxed text-ink-dim"
+               data-cast-note data-tone="ok"></p>
+
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button class="btn-hud" type="button" data-cast-device aria-pressed="false">CAST TO DEVICE</button>
+              <button class="btn-hud" type="button" data-cast-detach>DETACHED WINDOW</button>
+              <button class="btn-hud" type="button" data-cast-copy>COPY ADDRESS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ INTERFACE ═══════════════════════════════════════════════════ -->
     <!-- On a large display the HUD is sized to the viewport and each column
          scrolls inside itself, so the command prompt is always reachable.

@@ -7,6 +7,7 @@ import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
 import { startHotkeys, bindKey } from './core/hotkeys.js';
 import { dictation } from './core/dictation.js';
+import { cast } from './core/cast.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
 import { narrator } from './core/narrator.js';
@@ -27,6 +28,7 @@ import { CommandBar } from './components/CommandBar.js';
 import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
 import { NarrateToggle } from './components/NarrateToggle.js';
 import { ListenToggle } from './components/ListenToggle.js';
+import { CastPanel } from './components/CastPanel.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -60,6 +62,7 @@ const dashboard = [
   new NarrateToggle('#narrate-toggle'),
   new ListenToggle('#listen-toggle'),
   new CommandBar('#command'),
+  new CastPanel('#cast'),
 ];
 
 /**
@@ -199,6 +202,7 @@ function start() {
   step('Ambient log', () => bindAmbientLog());
   step('Keyboard shortcuts', () => {
     bindKey('v', 'Spoken directives on or off', () => dictation.toggle());
+    bindKey('p', 'Cast the dashboard elsewhere', 'cast');
     startHotkeys();
   });
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
@@ -231,7 +235,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, cast, execute, dashboard };
 }
 
 if (document.readyState === 'loading') {
