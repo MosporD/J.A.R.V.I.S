@@ -331,12 +331,19 @@ register({
 
 register({
   name: 'theme',
-  summary: `Re-hue the interface — ${Object.keys(THEMES).join(' | ')}.`,
+  summary: `Re-hue the interface — ${Object.keys(THEMES).join(' | ')} | next.`,
   run(args) {
-    const name = (args[0] || '').toLowerCase();
+    const names = Object.keys(THEMES);
+    let name = (args[0] || '').toLowerCase();
+    // `next` walks the list, so the palette can live on a single keystroke.
+    if (name === 'next' || name === 'cycle') {
+      const current = document.documentElement.style.getPropertyValue('--color-hud').trim();
+      const index = names.findIndex((key) => THEMES[key].hud === current);
+      name = names[(index + 1) % names.length];
+    }
     const preset = THEMES[name];
     if (!preset) {
-      log(`Available palettes: ${Object.keys(THEMES).join(', ')}`, 'sys', 'theme');
+      log(`Available palettes: ${names.join(', ')}, next`, 'sys', 'theme');
       return Promise.resolve();
     }
     const root = document.documentElement;
@@ -356,6 +363,109 @@ register({
   run() {
     bus.emit('boot:replay');
     return Promise.resolve();
+  },
+});
+
+/**
+ * Hand a drafted message to whatever mail client the operator actually uses.
+ *
+ * The dashboard is a static front end with no server of its own, so it does not
+ * send: it composes. A `mailto:` hand-off keeps the credentials where they
+ * belong — in Outlook, or whatever is registered — and means there is nothing
+ * here to leak, no key in the bundle and no account to configure.
+ */
+
+/** Deliberately permissive: reject the obviously malformed, not the unusual. */
+const ADDRESS = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+
+/** Most clients truncate a very long mailto; warn rather than silently lose it. */
+const MAILTO_LIMIT = 1800;
+
+export function parseEmail(rest) {
+  const [to, ...tail] = rest;
+  const recipients = (to || '').split(',').map((a) => a.trim()).filter(Boolean);
+  const remainder = tail.join(' ');
+  // `subject | body` — everything before the first pipe is the subject line.
+  const pipe = remainder.indexOf('|');
+  const subject = (pipe === -1 ? remainder : remainder.slice(0, pipe)).trim();
+  const body = pipe === -1 ? '' : remainder.slice(pipe + 1).trim();
+  return { recipients, subject, body };
+}
+
+export function mailtoURL({ recipients, subject, body }) {
+  const query = [];
+  if (subject) query.push(`subject=${encodeURIComponent(subject)}`);
+  if (body) query.push(`body=${encodeURIComponent(body)}`);
+  // Addresses are validated above, so they travel unencoded: some clients
+  // mishandle a percent-encoded "@" in the recipient slot.
+  return `mailto:${recipients.join(',')}${query.length ? `?${query.join('&')}` : ''}`;
+}
+
+/** Open the draft without navigating the dashboard away from itself. */
+function openDraft(url) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.rel = 'noopener';
+  link.style.display = 'none';
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+register({
+  name: 'email',
+  aliases: ['mail', 'compose'],
+  summary: 'Open a drafted message in your mail client.',
+  run(args) {
+    if (!args.length) {
+      log('Usage: email <address[,address]> <subject> | <body>', 'warn', 'email');
+      log('  e.g. email ops@zain.jo Reactor report | All systems nominal.', 'sys', 'email');
+      return respond('Who am I writing to, sir?');
+    }
+
+    const draft = parseEmail(args);
+
+    if (!draft.recipients.length) {
+      audio.error();
+      log('No recipient given.', 'alert', 'email');
+      return respond('I need a recipient before I can draft that.');
+    }
+
+    const invalid = draft.recipients.filter((address) => !ADDRESS.test(address));
+    if (invalid.length) {
+      audio.error();
+      log(`Not a usable address: ${invalid.join(', ')}`, 'alert', 'email');
+      return respond('That address does not look right, sir.');
+    }
+
+    const url = mailtoURL(draft);
+    if (url.length > MAILTO_LIMIT) {
+      audio.error();
+      log(
+        `Draft is too long for a mail hand-off (${url.length} characters, limit ${MAILTO_LIMIT}).`,
+        'alert',
+        'email',
+      );
+      return respond('That message is too long to hand over. Shorten it and try again.');
+    }
+
+    try {
+      openDraft(url);
+    } catch (error) {
+      audio.error();
+      log(`Could not reach a mail client — ${error.message}`, 'alert', 'email');
+      return respond('I could not raise a mail client on this machine.');
+    }
+
+    audio.confirm();
+    log(`TO       ${draft.recipients.join(', ')}`, 'ok', 'email');
+    log(`SUBJECT  ${draft.subject || '(none)'}`, 'sys', 'email');
+    if (draft.body) log(`BODY     ${draft.body}`, 'sys', 'email');
+    log('Draft handed to your mail client — review and send it there.', 'sys', 'email');
+
+    return respond(
+      `Draft prepared for ${draft.recipients.join(' and ')}. It is waiting in your mail client, sir.`,
+    );
   },
 });
 

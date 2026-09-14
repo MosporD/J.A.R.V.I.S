@@ -31,12 +31,21 @@ export class BootSequence extends Component {
     this.pct = this.$('[data-boot-pct]');
     this.serial = this.$('[data-boot-serial]');
     this.running = false;
+    this.startedAt = 0;
+    this.timers = new Set();
+    this.track(() => this.clearTimers());
 
     if (this.serial) this.serial.textContent = `${sigil()}·${sigil()}`;
 
     const skip = (event) => {
       if (!this.running) return;
       if (event.type === 'keydown' && event.key === 'Tab') return;
+      // The gesture that *launched* a replay is still propagating towards this
+      // window-level listener: `reboot` runs synchronously from the prompt's
+      // own keydown handler, so the Enter that submitted it reaches us with the
+      // sequence already running and cancels it on the spot. An event stamped
+      // before the run began cannot be a request to skip that run.
+      if (event.timeStamp <= this.startedAt) return;
       this.finish(true);
     };
     this.listen(window, 'keydown', skip);
@@ -49,27 +58,43 @@ export class BootSequence extends Component {
   async start() {
     if (this.running) return;
     this.running = true;
+    this.startedAt = performance.now();
     this.aborted = false;
+    this.clearTimers();
     this.el.dataset.done = 'false';
     this.lines.replaceChildren();
-    audio.power();
 
-    const step = prefersReducedMotion ? 10 : 260;
+    // Nothing inside the checklist is allowed to strand the operator behind the
+    // overlay: it is fixed, opaque and covers the viewport, so a throw here
+    // would hide the entire interface rather than merely skip an animation.
+    try {
+      audio.power();
 
-    for (let i = 0; i < LINES.length; i += 1) {
+      const step = prefersReducedMotion ? 10 : 260;
+
+      for (let i = 0; i < LINES.length; i += 1) {
+        if (this.aborted) return;
+        const [system, note] = LINES[i];
+        this.print(system, note);
+        this.progress(((i + 1) / LINES.length) * 100);
+        audio.blip({ freq: 520 + i * 90, dur: 0.06, gain: 0.07, type: 'triangle' });
+        // eslint-disable-next-line no-await-in-loop
+        await this.wait(step);
+      }
+
       if (this.aborted) return;
-      const [system, note] = LINES[i];
-      this.print(system, note);
-      this.progress(((i + 1) / LINES.length) * 100);
-      audio.blip({ freq: 520 + i * 90, dur: 0.06, gain: 0.07, type: 'triangle' });
-      // eslint-disable-next-line no-await-in-loop
-      await this.wait(step);
+      this.progress(100);
+      await this.wait(prefersReducedMotion ? 10 : 420);
+      this.finish(false);
+    } catch (error) {
+      console.error('[boot] sequence failed', error);
+      this.finish(true);
+      bus.emit('log', {
+        level: 'alert',
+        tag: 'boot',
+        text: `Start-up sequence faulted — ${error.message}`,
+      });
     }
-
-    if (this.aborted) return;
-    this.progress(100);
-    await this.wait(prefersReducedMotion ? 10 : 420);
-    this.finish(false);
   }
 
   print(system, note) {
@@ -90,17 +115,38 @@ export class BootSequence extends Component {
     if (this.pct) this.pct.textContent = `${Math.round(value)}%`;
   }
 
+  /**
+   * A cancellable delay. Timers live in one set rather than one disposer each,
+   * so a replayed sequence does not pile teardown closures up on the component.
+   * Cancelling still settles the promise — resolving `false` rather than the
+   * `true` of a delay that elapsed — so an aborted run unwinds its loop and
+   * returns instead of being suspended forever on a timer that never fires.
+   */
   wait(ms) {
     return new Promise((resolve) => {
-      const id = setTimeout(resolve, ms);
-      this.track(() => clearTimeout(id));
+      const timer = { resolve };
+      timer.id = setTimeout(() => {
+        this.timers.delete(timer);
+        resolve(true);
+      }, ms);
+      this.timers.add(timer);
     });
+  }
+
+  /** Drop every pending timer — on abort, on replay and on teardown. */
+  clearTimers() {
+    this.timers.forEach((timer) => {
+      clearTimeout(timer.id);
+      timer.resolve(false);
+    });
+    this.timers.clear();
   }
 
   finish(skipped) {
     if (!this.running) return;
     this.running = false;
     this.aborted = true;
+    this.clearTimers();
     this.progress(100);
     this.el.dataset.done = 'true';
 
@@ -118,11 +164,12 @@ export class BootSequence extends Component {
     // The greeting only happens once per session, and only after a gesture has
     // unlocked audio — otherwise the browser silently drops it.
     if (first) {
-      setTimeout(() => {
+      this.wait(600).then((elapsed) => {
+        if (!elapsed) return;
         respond(
           'Good day, sir. All systems are online and the arc reactor is holding steady. How may I help?',
         );
-      }, 600);
+      });
     }
   }
 }

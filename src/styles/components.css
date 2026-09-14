@@ -411,6 +411,36 @@
   }
 
   /* ---------------------------------------------------------------------
+     Cast overlay — a modal errand, not a panel in the grid.
+     ------------------------------------------------------------------ */
+  .cast-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--color-void) 82%, transparent);
+    backdrop-filter: blur(3px);
+  }
+  .cast-card {
+    width: min(46rem, 100%);
+    max-height: 90dvh;
+    overflow: auto;
+    border: 1px solid color-mix(in srgb, var(--color-hud) 28%, transparent);
+    background: color-mix(in srgb, var(--color-void) 94%, var(--color-hud));
+    box-shadow: var(--shadow-hud, 0 0 40px -12px rgba(0, 243, 255, 0.5));
+  }
+  .cast-qr {
+    width: min(13rem, 60vw);
+    padding: 0.6rem;
+    background: color-mix(in srgb, var(--color-void) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-hud) 22%, transparent);
+  }
+  .cast-qr svg { display: block; width: 100%; height: auto; }
+  [data-cast-note][data-tone="warn"] { color: var(--color-caution); }
+
+  /* ---------------------------------------------------------------------
      Boot overlay.
      ------------------------------------------------------------------ */
   .boot {
