@@ -21,6 +21,7 @@ const state = {
   mic: false,
   voice: true,
   narrate: 'alerts',      // off | alerts | all — what the log reads aloud
+  dictating: false,       // spoken directives being listened for
   reduceMotion: false,
   threat: 'nominal',      // nominal | elevated | critical
   reactor: 92,            // core output %

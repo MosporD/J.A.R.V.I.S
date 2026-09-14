@@ -58,6 +58,18 @@ export class CommandBar extends Component {
       });
     }
 
+    // Live feedback while dictating — but never over something being typed.
+    this.on('dictation:interim', ({ text }) => {
+      if (document.activeElement === this.input) return;
+      this.input.value = text;
+      this.onInput();
+    });
+    this.on('dictation:final', () => {
+      if (document.activeElement === this.input) return;
+      this.input.value = '';
+      this.onInput();
+    });
+
     this.watch('mode', (mode) => {
       this.busy = mode === MODE.PROCESSING;
       this.input.setAttribute('aria-busy', String(this.busy));

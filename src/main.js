@@ -5,7 +5,8 @@ import { store } from './core/store.js';
 import { telemetry } from './core/telemetry.js';
 import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
-import { startHotkeys } from './core/hotkeys.js';
+import { startHotkeys, bindKey } from './core/hotkeys.js';
+import { dictation } from './core/dictation.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
 import { narrator } from './core/narrator.js';
@@ -25,6 +26,7 @@ import { LogStream } from './components/LogStream.js';
 import { CommandBar } from './components/CommandBar.js';
 import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
 import { NarrateToggle } from './components/NarrateToggle.js';
+import { ListenToggle } from './components/ListenToggle.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -56,6 +58,7 @@ const dashboard = [
   new ForgePanel('#forge'),
   new ForgeLink('#forge-link'),
   new NarrateToggle('#narrate-toggle'),
+  new ListenToggle('#listen-toggle'),
   new CommandBar('#command'),
 ];
 
@@ -194,7 +197,10 @@ function start() {
   step('Interface audio', () => bindInterfaceSounds());
   step('Quick actions', () => bindQuickActions());
   step('Ambient log', () => bindAmbientLog());
-  step('Keyboard shortcuts', () => startHotkeys());
+  step('Keyboard shortcuts', () => {
+    bindKey('v', 'Spoken directives on or off', () => dictation.toggle());
+    startHotkeys();
+  });
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
 
   dashboard.forEach(mountSafely);
@@ -225,7 +231,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, execute, dashboard };
 }
 
 if (document.readyState === 'loading') {
