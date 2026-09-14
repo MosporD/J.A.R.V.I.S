@@ -50,12 +50,24 @@
           if (message && faults.indexOf(message) === -1) faults.push(message);
         }
 
+        // Capture phase, because a stylesheet or module that fails to load
+        // fires its error event on the element, not on window, and never
+        // reaches a bubbling handler. That is exactly how a build error
+        // arrives: the script 500s and no exception is ever thrown.
         window.addEventListener('error', function (event) {
+          var target = event.target;
+          if (target && target !== window && target.tagName) {
+            record(
+              'Failed to load ' + target.tagName.toLowerCase() + ': ' +
+              (target.src || target.href || '(unknown source)'),
+            );
+            return;
+          }
           var where = event.filename
             ? ' (' + String(event.filename).split('/').pop() + ':' + event.lineno + ')'
             : '';
           record((event.message || 'Script error') + where);
-        });
+        }, true);
 
         window.addEventListener('unhandledrejection', function (event) {
           var reason = event.reason;
@@ -79,9 +91,11 @@
           var panel = boot.querySelector('[data-boot-fault]');
           var text = boot.querySelector('[data-boot-fault-text]');
           if (text) {
-            text.textContent = faults.length
+            text.textContent = (faults.length
               ? faults.join('\n')
-              : 'No error was reported. The start-up sequence simply never finished.';
+              : 'No error reached the page.'
+            ) + '\n\nCheck the browser console, and the terminal running the dev server — '
+              + 'a build or stylesheet error is reported there, not here.';
           }
           if (panel) panel.hidden = false;
           console.error('[failsafe] start-up stalled after ' + STALL_MS + 'ms', faults);
