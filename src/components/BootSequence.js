@@ -63,24 +63,38 @@ export class BootSequence extends Component {
     this.clearTimers();
     this.el.dataset.done = 'false';
     this.lines.replaceChildren();
-    audio.power();
 
-    const step = prefersReducedMotion ? 10 : 260;
+    // Nothing inside the checklist is allowed to strand the operator behind the
+    // overlay: it is fixed, opaque and covers the viewport, so a throw here
+    // would hide the entire interface rather than merely skip an animation.
+    try {
+      audio.power();
 
-    for (let i = 0; i < LINES.length; i += 1) {
+      const step = prefersReducedMotion ? 10 : 260;
+
+      for (let i = 0; i < LINES.length; i += 1) {
+        if (this.aborted) return;
+        const [system, note] = LINES[i];
+        this.print(system, note);
+        this.progress(((i + 1) / LINES.length) * 100);
+        audio.blip({ freq: 520 + i * 90, dur: 0.06, gain: 0.07, type: 'triangle' });
+        // eslint-disable-next-line no-await-in-loop
+        await this.wait(step);
+      }
+
       if (this.aborted) return;
-      const [system, note] = LINES[i];
-      this.print(system, note);
-      this.progress(((i + 1) / LINES.length) * 100);
-      audio.blip({ freq: 520 + i * 90, dur: 0.06, gain: 0.07, type: 'triangle' });
-      // eslint-disable-next-line no-await-in-loop
-      await this.wait(step);
+      this.progress(100);
+      await this.wait(prefersReducedMotion ? 10 : 420);
+      this.finish(false);
+    } catch (error) {
+      console.error('[boot] sequence failed', error);
+      this.finish(true);
+      bus.emit('log', {
+        level: 'alert',
+        tag: 'boot',
+        text: `Start-up sequence faulted — ${error.message}`,
+      });
     }
-
-    if (this.aborted) return;
-    this.progress(100);
-    await this.wait(prefersReducedMotion ? 10 : 420);
-    this.finish(false);
   }
 
   print(system, note) {

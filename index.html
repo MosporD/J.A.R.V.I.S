@@ -32,6 +32,63 @@
       <div class="fx-vignette"></div>
     </div>
 
+
+    <!-- ══ START-UP FAILSAFE ═══════════════════════════════════════════════
+         Deliberately a classic inline script, not a module. The boot overlay is
+         fixed, opaque and covers the viewport, so anything that stops the app
+         from marking it done leaves the operator staring at "INITIALISING"
+         with no way through and no idea why — including the case where the
+         module graph itself fails to evaluate and main.js never runs at all.
+         This runs regardless, records whatever went wrong, and always offers a
+         way into the interface. -->
+    <script>
+      (function () {
+        var STALL_MS = 6000;
+        var faults = [];
+
+        function record(message) {
+          if (message && faults.indexOf(message) === -1) faults.push(message);
+        }
+
+        window.addEventListener('error', function (event) {
+          var where = event.filename
+            ? ' (' + String(event.filename).split('/').pop() + ':' + event.lineno + ')'
+            : '';
+          record((event.message || 'Script error') + where);
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          record('Unhandled rejection: ' + ((reason && reason.message) || reason));
+        });
+
+        function dismiss() {
+          var boot = document.getElementById('boot');
+          if (boot) boot.dataset.done = 'true';
+        }
+
+        document.addEventListener('click', function (event) {
+          var target = event.target;
+          if (target && target.closest && target.closest('[data-boot-dismiss]')) dismiss();
+        });
+
+        setTimeout(function () {
+          var boot = document.getElementById('boot');
+          if (!boot || boot.dataset.done === 'true') return;
+
+          var panel = boot.querySelector('[data-boot-fault]');
+          var text = boot.querySelector('[data-boot-fault-text]');
+          if (text) {
+            text.textContent = faults.length
+              ? faults.join('\n')
+              : 'No error was reported. The start-up sequence simply never finished.';
+          }
+          if (panel) panel.hidden = false;
+          console.error('[failsafe] start-up stalled after ' + STALL_MS + 'ms', faults);
+        }, STALL_MS);
+      })();
+    </script>
+
     <!-- ══ BOOT SEQUENCE ═══════════════════════════════════════════════ -->
     <div id="boot" class="boot" data-done="false" role="status" aria-live="polite">
       <div class="w-[min(560px,88vw)] px-6">
@@ -58,6 +115,15 @@
             <span class="label-hud">SERIAL <span data-boot-serial>——</span></span>
             <span class="label-hud animate-breathe">PRESS ANY KEY TO SKIP</span>
           </div>
+        </div>
+
+        <!-- Shown only by the failsafe below, when start-up stalls. -->
+        <div class="mt-6 border border-dashed p-3" data-boot-fault hidden
+             style="border-color: color-mix(in srgb, var(--color-alert) 45%, transparent)">
+          <div class="label-hud" style="color: var(--color-alert)">START-UP DID NOT COMPLETE</div>
+          <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[0.6875rem] text-ink-dim"
+               data-boot-fault-text></pre>
+          <button class="btn-hud mt-3" type="button" data-boot-dismiss>CONTINUE TO INTERFACE</button>
         </div>
       </div>
     </div>

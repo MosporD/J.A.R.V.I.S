@@ -30,6 +30,9 @@ import { BootSequence } from './components/BootSequence.js';
 
 const dashboard = [
   new LogStream('#logs'),          // first: it must catch every start-up line
+  new BootSequence('#boot'),       // second: the overlay blocks the whole
+                                   // viewport, so it is never a casualty of a
+                                   // panel further down this list failing
   new StatusBar('#statusbar'),
   new Diagnostics('#diagnostics'),
   new PowerGrid('#power'),
@@ -44,8 +47,31 @@ const dashboard = [
   new AlertsPanel('#alerts'),
   new ThreatBadge('#threat-state'),
   new CommandBar('#command'),
-  new BootSequence('#boot'),       // last: it greets once everything is live
 ];
+
+/**
+ * Mount one panel without letting it take the others with it.
+ *
+ * `forEach` over bare `mount()` calls meant the first panel to throw ended the
+ * loop, so a single unsupported browser API anywhere in this list left every
+ * panel after it unmounted — the boot overlay included, which then sat over the
+ * interface at full opacity forever. A dashboard that loses its radar should
+ * lose its radar, not its start-up sequence.
+ */
+function mountSafely(component) {
+  const id = component.el?.id || component.constructor.name;
+  try {
+    component.mount();
+  } catch (error) {
+    console.error(`[mount] ${id} failed`, error);
+    bus.emit('panel:failed', { id, error });
+    bus.emit('log', {
+      level: 'alert',
+      tag: 'mount',
+      text: `Panel "${id}" failed to initialise — ${error.message}`,
+    });
+  }
+}
 
 /** Buttons that simply dispatch a directive. */
 function bindQuickActions(root = document) {
@@ -81,14 +107,30 @@ function bindAmbientLog() {
   schedule();
 }
 
-function start() {
-  telemetry.start();
-  bindInterfaceSounds();
-  bindQuickActions();
-  bindAmbientLog();
+/** Run one piece of start-up wiring, reporting rather than aborting on failure. */
+function step(label, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.error(`[start] ${label} failed`, error);
+    bus.emit('log', {
+      level: 'alert',
+      tag: 'start',
+      text: `${label} failed to start — ${error.message}`,
+    });
+  }
+}
 
-  store.set('reduceMotion', prefersReducedMotion);
-  dashboard.forEach((component) => component.mount());
+function start() {
+  // These run before any panel mounts, so an exception in one of them used to
+  // mean nothing mounted at all — boot overlay included.
+  step('Telemetry', () => telemetry.start());
+  step('Interface audio', () => bindInterfaceSounds());
+  step('Quick actions', () => bindQuickActions());
+  step('Ambient log', () => bindAmbientLog());
+  step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
+
+  dashboard.forEach(mountSafely);
 
   bus.emit('log', { level: 'sys', tag: 'kernel', text: `Session ${sigil()} opened.` });
   bus.emit('log', { level: 'sys', tag: 'kernel', text: 'Type "help" for the directive index. Press "/" to focus the prompt.' });
