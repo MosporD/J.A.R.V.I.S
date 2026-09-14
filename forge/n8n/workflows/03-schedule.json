@@ -1,0 +1,67 @@
+{
+  "name": "forge \u00b7 fill schedule",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expressionValue": "0 5 * * *"
+            }
+          ]
+        }
+      },
+      "id": "d19394af-4852-4ae5-9354-dbc80fb507c2",
+      "name": "Daily 05:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://forge-api:8000/schedule",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ slots_per_day: 3, days: 7, start_hour: 9 }) }}"
+      },
+      "id": "2ac640ba-0faf-474e-b20a-19042cd6a462",
+      "name": "Fill slots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 05:00": {
+      "main": [
+        [
+          {
+            "node": "Fill slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

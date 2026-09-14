@@ -1,0 +1,152 @@
+{
+  "name": "forge \u00b7 harvest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expressionValue": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "bf290324-7bdc-4086-984f-51e41d36f5f7",
+      "name": "Daily 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://hnrss.org/frontpage",
+        "options": {}
+      },
+      "id": "9b8ac7d7-cccc-4d09-9fe0-9dac6bda494e",
+      "name": "Read feeds",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shape whatever the source returned into the contract /harvest expects.\n// Fingerprinting happens server-side; this only needs title and url.\nreturn [{ json: { items: $input.all().map(i => ({\n  title:   i.json.title   || '',\n  url:     i.json.link    || i.json.url || '',\n  summary: (i.json.contentSnippet || i.json.content || '').slice(0, 500),\n})) } }];"
+      },
+      "id": "e0220cb8-b819-4dcc-899b-921af640fe3f",
+      "name": "Normalise",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://forge-api:8000/harvest",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: \"rss\", topic: $env.FORGE_TOPIC || \"\", items: $json.items }) }}"
+      },
+      "id": "9125d462-5586-401b-a8a6-33ccb5a4deb5",
+      "name": "Harvest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://forge-api:8000/score",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ topic: $env.FORGE_TOPIC || \"\", limit: 20 }) }}"
+      },
+      "id": "ca941239-cb63-4aed-aac9-8141189deb48",
+      "name": "Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 06:00": {
+      "main": [
+        [
+          {
+            "node": "Read feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read feeds": {
+      "main": [
+        [
+          {
+            "node": "Normalise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise": {
+      "main": [
+        [
+          {
+            "node": "Harvest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Harvest": {
+      "main": [
+        [
+          {
+            "node": "Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

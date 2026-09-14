@@ -1,0 +1,134 @@
+{
+  "name": "forge \u00b7 build assets",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expressionValue": "15 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "368ef706-62e2-4df4-927d-996dffb020da",
+      "name": "Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://forge-api:8000/queue/approved",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "id": "ebe8ce17-d276-4efa-ae03-54f45350c7cc",
+      "name": "Approved queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "variants",
+        "options": {}
+      },
+      "id": "a4362b7c-a548-40cd-ba0a-688862bdd9b2",
+      "name": "One at a time",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://forge-api:8000/assets",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ variant_id: $json.id }) }}"
+      },
+      "id": "5a08cefe-74fb-4a89-8dd7-0633e1859e7f",
+      "name": "Build assets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Hourly": {
+      "main": [
+        [
+          {
+            "node": "Approved queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved queue": {
+      "main": [
+        [
+          {
+            "node": "One at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One at a time": {
+      "main": [
+        [
+          {
+            "node": "Build assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

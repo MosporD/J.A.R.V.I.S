@@ -5,6 +5,9 @@ import { store } from './core/store.js';
 import { telemetry } from './core/telemetry.js';
 import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
+import { speech } from './core/speech.js';
+import { forge } from './core/forge.js';
+import { narrator } from './core/narrator.js';
 import { prefersReducedMotion } from './core/ticker.js';
 import { sigil } from './core/format.js';
 
@@ -18,6 +21,8 @@ import { PowerGrid } from './components/PowerGrid.js';
 import { AlertsPanel, ThreatBadge } from './components/AlertsPanel.js';
 import { LogStream } from './components/LogStream.js';
 import { CommandBar } from './components/CommandBar.js';
+import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
+import { NarrateToggle } from './components/NarrateToggle.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -46,6 +51,9 @@ const dashboard = [
   new WorldClock('#worldclock'),
   new AlertsPanel('#alerts'),
   new ThreatBadge('#threat-state'),
+  new ForgePanel('#forge'),
+  new ForgeLink('#forge-link'),
+  new NarrateToggle('#narrate-toggle'),
   new CommandBar('#command'),
 ];
 
@@ -125,6 +133,10 @@ function start() {
   // These run before any panel mounts, so an exception in one of them used to
   // mean nothing mounted at all — boot overlay included.
   step('Telemetry', () => telemetry.start());
+  // Optional by design: the workshop runs whether or not the pipeline is up,
+  // so this backs off quietly instead of retrying a dead port forever.
+  step('Forge pipeline', () => forge.start());
+  step('Narrator', () => narrator.start());
   step('Interface audio', () => bindInterfaceSounds());
   step('Quick actions', () => bindQuickActions());
   step('Ambient log', () => bindAmbientLog());
@@ -156,7 +168,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, audio, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, execute, dashboard };
 }
 
 if (document.readyState === 'loading') {
