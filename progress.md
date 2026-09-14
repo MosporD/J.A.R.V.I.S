@@ -18,6 +18,7 @@ history, append to it.
 | Test suites | manual, headless Chromium — 83/83 passing |
 | Diff vs base | 21 files, +1575 / −55, 9 commits |
 | Merge conflicts | none — branch is current with its base |
+| Stuck-boot symptom | ✅ **cleared on the operator's Windows hardware** (confirmed 2026-09-14) |
 
 ---
 
@@ -64,6 +65,9 @@ Symptom: dashboard frozen on `INITIALISING 0%` forever.
    `base.css`'s multi-line backslash-continued data URI stops terminating,
    Tailwind fails, the dev server 500s the CSS module, `main.js` never runs.
    **Lesson: verify the base is current before building on it.**
+
+   ✅ **Confirmed cleared on the operator's own Windows machine, 2026-09-14.**
+   All three causes are now closed; the original `INITIALISING 0%` report is resolved.
 
 ### Commits
 
@@ -113,8 +117,6 @@ vendored locally.
 - [ ] **Mark PR #3 ready for review, or keep it draft?** Never confirmed.
 - [ ] **Is basing on `c/clever-turing-jnvekr` intended,** or should this be
       rebased onto `main` to unstack it? Never confirmed.
-- [ ] **Did the Windows CRLF fix actually clear the symptom on your machine?**
-      Verified in this container only — never confirmed on your hardware.
 - [ ] **Gestures:** MediaPipe vs frame-differencing (see above).
 - [ ] **PR #2 is a draft blocking PR #3** — what's the plan for landing it?
 
@@ -158,6 +160,10 @@ session's local work. **Don't drop it without checking first.**
 ---
 
 ## Update log
+
+- **2026-09-14** — Operator confirmed the stuck-boot symptom is cleared on their
+  own Windows hardware. All three causes closed; the original defect is
+  resolved and no longer carries an open verification.
 
 - **2026-09-14** — Added this file. Verified build passes and the 3D chunk
   splits correctly. Found the PR stack (#3 → #2 → main) and that no CI is
