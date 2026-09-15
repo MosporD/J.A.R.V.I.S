@@ -187,7 +187,20 @@ export class ArcCore3D extends Component {
     return object;
   }
 
-  /** The one material shape used throughout: additive, unlit, unsorted. */
+  /**
+   * The one material shape used throughout: additive, unlit, unsorted.
+   *
+   * Front faces only. A torus or a sphere drawn `DoubleSide` rasterises its
+   * far side as well, and additive blending adds both — so every closed shape
+   * rendered at roughly twice its nominal brightness. On the bright passes
+   * that pushed the result past what the framebuffer can hold, clipping the
+   * saturated cyan towards white; the flat core's arcs are visibly more
+   * saturated than the 3D ones were. Drawing one side costs half the
+   * fragments and puts the colour back.
+   *
+   * Flat geometry — the bloom planes and the triangle's face — never had a
+   * far side to draw, so their values are unchanged.
+   */
   glowMaterial(opacity, color = 0xffffff) {
     return this.own(new THREE.MeshBasicMaterial({
       color,
@@ -196,7 +209,7 @@ export class ArcCore3D extends Component {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       depthTest: false,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     }));
   }
 
@@ -278,7 +291,7 @@ export class ArcCore3D extends Component {
         radius: RADIUS.tick - length / 2,
         length,
         thickness: major ? 1.4 * PX : 1 * PX,
-        intensity: major ? 0.55 : 0.16,
+        intensity: major ? 0.9 : 0.3,
       };
     }, this.tickMaterial);
     this.ticks.renderOrder = ORDER.ring;
@@ -292,8 +305,8 @@ export class ArcCore3D extends Component {
    * silhouette stays the one the flat core draws.
    */
   buildSegments() {
-    this.segmentGlow = this.glowMaterial(0.07);
-    this.segmentHalo = this.glowMaterial(0.1);
+    this.segmentGlow = this.glowMaterial(0.13);
+    this.segmentHalo = this.glowMaterial(0.18);
     this.segmentLine = this.glowMaterial(0.85);
     this.segments = [];
 
@@ -317,7 +330,7 @@ export class ArcCore3D extends Component {
     const count = 45;
     const circumference = TAU * RADIUS.dash;
     const dash = (2 / 11) * (circumference / count);
-    this.dashMaterial = this.glowMaterial(0.42);
+    this.dashMaterial = this.glowMaterial(0.7);
     this.dashes = this.radialBatch(count, (i) => ({
       angle: (i / count) * TAU,
       radius: RADIUS.dash,
@@ -332,7 +345,7 @@ export class ArcCore3D extends Component {
 
   /** Four brackets that hold their angle against the spin, with end ticks. */
   buildBrackets() {
-    this.bracketMaterial = this.glowMaterial(0.55);
+    this.bracketMaterial = this.glowMaterial(0.9);
     this.brackets = new THREE.Group();
 
     const half = 0.09;
@@ -384,8 +397,8 @@ export class ArcCore3D extends Component {
       group.position.z = z;
       group.renderOrder = ORDER.data;
 
-      const track = this.glowMaterial(0.12);
-      const glow = this.glowMaterial(0.18);
+      const track = this.glowMaterial(0.22);
+      const glow = this.glowMaterial(0.32);
       const line = this.glowMaterial(0.95);
 
       group.add(this.arcMesh(radius, 3 * PX / 2, 0, 1.1 / 2, track, 96));
@@ -416,7 +429,7 @@ export class ArcCore3D extends Component {
    * `instanceColor`, so the fade ladder costs no extra draw calls.
    */
   buildOrbiters() {
-    this.orbitMaterial = this.glowMaterial(0.7);
+    this.orbitMaterial = this.glowMaterial(1);
     this.orbiters = [0, 1, 2].map((i) => {
       const group = new THREE.Group();
       // The squash the 2D core applies becomes a real inclination.
@@ -504,7 +517,7 @@ export class ArcCore3D extends Component {
     // two of the three became strokes through the middle of the reactor.
     // They stay concentric; a few degrees of lean and a little separation in
     // depth is all that is needed to tell them apart in 3D.
-    this.containment = [[1, 1.8, 0.85], [0.72, 1.2, 0.5], [0.45, 1, 0.35]]
+    this.containment = [[1, 1.8, 1], [0.72, 1.2, 0.85], [0.45, 1, 0.6]]
       .map(([scale, width, opacity], i) => {
         const mesh = new THREE.Mesh(
           this.own(new THREE.TorusGeometry(r * scale, width * PX / 2, 6, 96)),
@@ -620,9 +633,9 @@ export class ArcCore3D extends Component {
 
     for (const group of this.segments) group.rotation.z = this.spin;
     this.segmentGlow.color.copy(key);
-    this.segmentGlow.opacity = 0.05 + this.energy * 0.04;
+    this.segmentGlow.opacity = 0.09 + this.energy * 0.07;
     this.segmentHalo.color.copy(key);
-    this.segmentHalo.opacity = 0.07 + this.energy * 0.05;
+    this.segmentHalo.opacity = 0.13 + this.energy * 0.09;
     this.segmentLine.color.copy(key);
 
     this.dashes.rotation.z = this.counterSpin;
@@ -715,7 +728,7 @@ export class ArcCore3D extends Component {
     while (this._ripplePool.length < this.ripples.length) {
       const mesh = new THREE.Mesh(
         this.own(new THREE.TorusGeometry(1, RIPPLE_TUBE, 4, 64)),
-        this.glowMaterial(0.45),
+        this.glowMaterial(0.75),
       );
       mesh.renderOrder = ORDER.ripple;
       mesh.userData.radius = 1;
@@ -735,7 +748,7 @@ export class ArcCore3D extends Component {
         mesh.geometry.dispose();
         mesh.geometry = new THREE.TorusGeometry(ripple.scale, RIPPLE_TUBE, 4, 64);
       }
-      mesh.material.opacity = ripple.life * 0.45;
+      mesh.material.opacity = ripple.life * 0.75;
       mesh.material.color.copy(key);
     });
   }

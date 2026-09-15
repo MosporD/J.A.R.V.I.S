@@ -55,7 +55,15 @@ def probe(path: Path) -> dict:
 
 @pytest.fixture(scope="module")
 def media(tmp_path_factory) -> dict:
-    """Synthetic fixtures — no network, no committed binaries."""
+    """Synthetic fixtures — no network, no committed binaries.
+
+    Skips rather than erroring when ffmpeg is missing. Building the fixtures
+    shells out, so without this every test that asks for media errors during
+    setup — including tests that only wanted a file path and never touch
+    ffmpeg themselves, such as the spec round-trip.
+    """
+    if not _ffmpeg_available():
+        pytest.skip("ffmpeg not installed")
     root = tmp_path_factory.mktemp("media")
     gen = [
         (["-f", "lavfi", "-i", "color=c=navy:s=1600x900:d=1", "-frames:v", "1"], "a.jpg"),
