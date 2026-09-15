@@ -56,6 +56,9 @@ const RADIUS = {
  */
 const PX = R / 190;
 
+/** Ripple stroke width, held constant as the ripple grows. */
+const RIPPLE_TUBE = 1.5 * PX / 2;
+
 /** The four arc segments: [start, length] in turns. The signature motion. */
 const SEGMENTS = [
   [0.0, 0.42],
@@ -74,6 +77,16 @@ const SEGMENTS = [
  * panel, which is indistinguishable from a weaker instrument.
  */
 const CAMERA_Z = R / 0.97 / Math.tan((38 / 2) * (Math.PI / 180));
+
+/** Scratch maths, reused across frames — only one frame is ever in flight. */
+const SCRATCH = {
+  matrix: new THREE.Matrix4(),
+  position: new THREE.Vector3(),
+  scale: new THREE.Vector3(),
+  quaternion: new THREE.Quaternion(),
+  euler: new THREE.Euler(),
+  color: new THREE.Color(),
+};
 
 const ORDER = {
   ambient: -20,
@@ -533,14 +546,17 @@ export class ArcCore3D extends Component {
     const box = this.el.getBoundingClientRect();
     const w = Math.max(1, Math.round(box.width));
     const h = Math.max(1, Math.round(box.height));
-    if (w === this._w && h === this._h) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (w === this._w && h === this._h && dpr === this._dpr) return;
     this._w = w;
     this._h = h;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this._dpr = dpr;
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
     // Keep the instrument framed the way the flat core is, whatever the aspect.
+    // Moving the camera does not touch the projection, so the matrix is
+    // rebuilt once, after both have been set.
     this.camera.position.z = w < h ? CAMERA_Z / this.camera.aspect : CAMERA_Z;
     this.camera.updateProjectionMatrix();
   }
@@ -654,10 +670,7 @@ export class ArcCore3D extends Component {
 
   paintOrbiters(elapsed, key) {
     this.orbitMaterial.color.copy(key);
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const scale = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
+    const { matrix, position, scale, quaternion } = SCRATCH;
 
     for (const orbiter of this.orbiters) {
       orbiter.group.rotation.z = orbiter.phase + this.counterSpin * 0.3;
@@ -701,10 +714,11 @@ export class ArcCore3D extends Component {
 
     while (this._ripplePool.length < this.ripples.length) {
       const mesh = new THREE.Mesh(
-        this.own(new THREE.TorusGeometry(1, 1.5 * PX / 2, 6, 96)),
+        this.own(new THREE.TorusGeometry(1, RIPPLE_TUBE, 4, 64)),
         this.glowMaterial(0.45),
       );
       mesh.renderOrder = ORDER.ripple;
+      mesh.userData.radius = 1;
       this.assembly.add(mesh);
       this._ripplePool.push(mesh);
     }
@@ -712,7 +726,15 @@ export class ArcCore3D extends Component {
       const ripple = this.ripples[i];
       mesh.visible = Boolean(ripple);
       if (!ripple) return;
-      mesh.scale.setScalar(ripple.scale);
+      // Grow the geometry rather than the mesh: scaling a torus scales its
+      // tube too, which would thicken the stroke as the ripple expands. The
+      // radius moves every frame, so only rebuild once it has moved enough
+      // to see.
+      if (Math.abs(mesh.userData.radius - ripple.scale) / ripple.scale > 0.02) {
+        mesh.userData.radius = ripple.scale;
+        mesh.geometry.dispose();
+        mesh.geometry = new THREE.TorusGeometry(ripple.scale, RIPPLE_TUBE, 4, 64);
+      }
       mesh.material.opacity = ripple.life * 0.45;
       mesh.material.color.copy(key);
     });
@@ -736,6 +758,10 @@ export class ArcCore3D extends Component {
     });
     (this._owned || []).forEach((object) => object.dispose?.());
     this._owned = [];
+    // `dispose()` frees the renderer's own resources but leaves the context
+    // alive. The core is swapped out and back on a context loss, and a page
+    // may only hold so many contexts before the oldest is killed.
+    this.renderer?.forceContextLoss?.();
     this.renderer?.dispose();
   }
 }

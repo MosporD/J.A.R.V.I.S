@@ -3,7 +3,7 @@
 Living status file. Update it at the end of each session; don't rewrite the
 history, append to it.
 
-**Last updated:** 2026-09-14 · **Branch:** `c/nifty-clarke-qz3wv2` @ `1698a4e` · **PR:** [#3](https://github.com/MosporD/J.A.R.V.I.S/pull/3) (draft)
+**Last updated:** 2026-09-15 · **Branch:** `c/nifty-clarke-qz3wv2` @ `1698a4e` · **PR:** [#3](https://github.com/MosporD/J.A.R.V.I.S/pull/3) (draft)
 
 ---
 
@@ -15,7 +15,8 @@ history, append to it.
 | Main bundle | 101.98 kB / 36.42 kB gzip |
 | Lazy 3D chunk | 540.77 kB / 135.45 kB gzip — correctly split out of main |
 | Automated CI | ❌ none configured on this repo |
-| Test suites | manual, headless Chromium — 83/83 passing |
+| JS test suites | ⚠️ **not in the repo** — ad-hoc scripts, see below |
+| forge (Python) suite | 6 passed, 37 skipped, 1 error |
 | Diff vs base | 21 files, +1575 / −55, 9 commits |
 | 3D core fidelity | ✅ rebuilt against the 2D drawing list — 9/9 render checks |
 | Merge conflicts | none — branch is current with its base |
@@ -160,25 +161,75 @@ session's local work. **Don't drop it without checking first.**
 
 ## Testing conventions
 
-- Headless Chromium via Playwright: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
+### ⚠️ The JavaScript suites are not in the repository
+
+Earlier sessions reported boot 14/14, email 11/11, hotkeys 10/10, voice 28/28
+and cast 20/20. Those numbers are real but **unreproducible**: the suites were
+ad-hoc scripts written into a session scratchpad, and the scratchpad is gone.
+`package.json` has no `test` script and there is not one `.test.js` in the
+tree. Nobody — including a future session — can re-run them or tell whether a
+change broke them.
+
+Treat every one of those numbers as a claim about a moment that has passed,
+not as a standing guarantee.
+
+The 3D core checks below were run this session and are in the same position:
+real, passing, and living only in a scratchpad until someone commits them.
+
+| Suite | Result | Committed? |
+|---|---|---|
+| boot | 14/14 | ❌ lost |
+| email | 11/11 | ❌ lost |
+| hotkeys | 10/10 | ❌ lost |
+| voice | 28/28 | ❌ lost |
+| cast | 20/20 | ❌ lost |
+| 3D core render | 9/9 | ❌ scratchpad only |
+
+### forge — the one committed suite
+
+`forge/pipeline/tests/` is a real pytest suite that nothing in the dashboard
+work has been running. Current state, after installing
+`requirements.txt` and `requirements-render.txt`:
+
+```
+6 passed, 37 skipped, 1 error
+```
+
+The skips are honest — 26 want `FORGE_TEST_DATABASE_URL` (a live Postgres),
+11 want a full ffmpeg. The single **error** is a genuine bug rather than a
+missing dependency: `test_spec_round_trips_through_json` only serialises and
+reparses a `RenderSpec`, but it takes the `media` fixture, which shells out to
+ffmpeg to build sample files. It errors where it should skip.
+
+Note the trap: the container ships a Playwright ffmpeg at
+`/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux`. Putting it on `PATH` makes things
+**worse** — it is a capture-only build, so `_ffmpeg_available()` returns true
+and 11 tests turn from clean skips into errors.
+
+### Browser harness
+
+- Headless Chromium: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
 - WebGL needs `--use-gl=swiftshader --enable-unsafe-swiftshader`
 - Use `waitUntil:'domcontentloaded'` — **not** `networkidle`; `forge.start()`
   polls a dead port and networkidle never fires
-- Kill stale preview servers before testing or you'll test an old bundle
-
-| Suite | Result |
-|---|---|
-| boot | 14/14 |
-| email | 11/11 |
-| hotkeys | 10/10 |
-| voice | 28/28 |
-| cast | 20/20 |
-| 3D core render | 9/9 |
-| **total** | **92/92** |
-
----
+- Kill stale preview servers before testing or you will test an old bundle.
+  Kill by port, not `pkill -f 'vite preview'` — that pattern matches the
+  shell's own command line and kills the session
+- Measure the canvas from a **composited screenshot**, not `readPixels`. On a
+  WebGL canvas without `preserveDrawingBuffer`, `readPixels` returns zeros
+  after compositing; a suite written that way reports a black core that is
+  rendering perfectly
 
 ## Update log
+
+- **2026-09-15** — Full recheck. Found that the JavaScript suites this file was
+  citing do not exist in the repository, and corrected the claim. Ran the
+  committed forge suite for the first time. Fixed four defects in the 3D core:
+  ripples scaled a unit torus so the stroke thickened ~3.7x as they expanded,
+  `paintOrbiters` allocated four objects per frame against a comment claiming
+  it allocated none, `resize()` ignored a change of device pixel ratio that the
+  2D base class tracks, and a disposed renderer kept its WebGL context alive
+  across core swaps.
 
 - **2026-09-14** — Rebuilt the 3D reactor core against the 2D renderer as the
   reference. Corrected four defects found by rendering it and looking: stroke
