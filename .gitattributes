@@ -1,0 +1,18 @@
+# Normalise line endings on checkout.
+#
+# Git on Windows defaults to core.autocrlf=true, which rewrites LF to CRLF when
+# you clone. That is invisible until something treats a lone backslash or a
+# shebang as significant — a CSS string continuation stops terminating, a shell
+# script gains a \r in its interpreter line, and a .sql or Dockerfile mounted
+# into a Linux container carries stray carriage returns.
+#
+# Pinning LF here means every clone gets the bytes CI and the containers expect,
+# whatever each developer's git config says.
+* text=auto eol=lf
+
+# Binary: never touch these.
+*.woff2 binary
+*.png   binary
+*.jpg   binary
+*.mp4   binary
+*.mp3   binary

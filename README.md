@@ -41,6 +41,7 @@ directive keys in the bottom-right panel.
 | `say <text>`           | Speak a line, driving the waveform and core bloom          |
 | `mic on` / `mic off`   | Microphone-reactive visualiser (asks permission)           |
 | `sfx` / `voice`        | Toggle interface cues and spoken replies                   |
+| `narrate <off\|alerts\|all>`| Read the event stream aloud                                |
 | `forge`                | Content pipeline status — buffer, stages, link             |
 | `boot`                 | Replay the start-up sequence                               |
 | `clear`                | Purge the log                                              |
@@ -49,6 +50,11 @@ Anything unrecognised gets a conversational reply rather than an error.
 
 **Prompt keys** — `Tab` accepts the ghost completion, `↑`/`↓` walk history
 (persisted to `localStorage`), `Ctrl/⌘+K` clears, `Esc` releases focus.
+
+**Narration** — the `NARR` button in the top rail cycles off → alerts → all.
+`alerts` is the default: anomalies are read aloud and routine chatter is not.
+J.A.R.V.I.S.'s own replies are never narrated — `respond()` already speaks
+them, so narrating the log too would say every answer twice.
 
 The primitives are on `window.JARVIS` (`bus`, `store`, `telemetry`, `audio`,
 `execute`) if you want to drive it from the console.
@@ -77,6 +83,7 @@ src/
     speech.js           TTS wrapper and the amplitude envelope
     commands.js         command registry, parser, and the conversational fallback
     forge.js            polls the content pipeline; backs off when it is absent
+    narrator.js         reads the event stream aloud; filters, queues, dedupes
     canvas.js           DPR sizing, grids, area traces
     theme.js            bridge from CSS custom properties to canvas colours
     format.js           time, byte, coordinate and easing helpers
