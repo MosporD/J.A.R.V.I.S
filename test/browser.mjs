@@ -74,11 +74,16 @@ export async function openDashboard(browser, { url, reducedMotion, webgl = true 
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
+    if (message.type() !== 'error') return;
     const text = message.text();
-    // The forge pipeline is not running in a test; its polling is expected.
-    if (message.type() === 'error' && !text.includes('ERR_CONNECTION_REFUSED')) {
-      errors.push(text);
-    }
+    // "Failed to load resource" is the browser narrating a network outcome,
+    // not the page throwing. Several tests block or fail a request on purpose
+    // to check the dashboard copes, and the forge pipeline is never running in
+    // a test, so its polling fails throughout. An actual fault still arrives
+    // either as a pageerror or as a console.error the dashboard itself wrote.
+    if (text.startsWith('Failed to load resource')) return;
+    if (text.includes('ERR_CONNECTION_REFUSED')) return;
+    errors.push(text);
   });
 
   if (!webgl) {
@@ -130,4 +135,21 @@ export async function brightness(page, selector) {
     }
     return sum / (pixels.length / 4);
   }, shot);
+}
+
+
+/**
+ * Wait for the event stream to show something.
+ *
+ * J.A.R.V.I.S. types its replies out a character at a time, so reading the log
+ * immediately after a directive returns catches it mid-word.
+ */
+export async function waitForLog(page, pattern, timeout = 10000) {
+  await page.waitForFunction(
+    (source) => new RegExp(source).test(
+      document.querySelector('[data-log-stream]')?.textContent || '',
+    ),
+    pattern.source,
+    { timeout },
+  );
 }
