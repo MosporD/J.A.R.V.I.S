@@ -3,7 +3,7 @@
 Living status file. Update it at the end of each session; append to the log
 rather than rewriting history.
 
-**Last updated:** 2026-09-15 · **Branch:** `c/kind-meitner-l66v5c` · **PR:** [#4](https://github.com/MosporD/J.A.R.V.I.S/pull/4) → `main`
+**Last updated:** 2026-09-16 · **Branch:** `c/kind-meitner-l66v5c` · **PR:** [#4](https://github.com/MosporD/J.A.R.V.I.S/pull/4) → `main`
 
 ---
 
@@ -14,11 +14,12 @@ rather than rewriting history.
 | Build | ✅ passes |
 | Main bundle | 106.96 kB / 38.02 kB gzip |
 | Lazy 3D chunk | 542.59 kB / 135.93 kB gzip — split out of main |
-| `npm test` | ✅ **29/29**, committed to the repo |
-| forge pytest | ✅ 6 passed, 38 skipped, 0 errors |
+| `npm test` | ✅ **43/43**, committed to the repo |
+| forge pytest | ✅ 26 passed, 38 skipped, 0 errors |
 | CI | ✅ `.github/workflows/ci.yml` — dashboard + forge |
 | PR stack | ✅ **unstacked** — PR #4 targets `main` directly |
 | Gestures | ✅ built, frame-differencing |
+| Reasoning layer | ✅ local model behind forge, tool-calling into the registry |
 
 ---
 
@@ -35,12 +36,51 @@ prompt with a directive registry, boot sequence, themes, and an audio layer.
 | Path | How | Leaves the machine? |
 |---|---|---|
 | Prompt | typed directives | no |
+| Assistant | local model via forge | **no** (with the default provider) |
 | Hotkeys | `hotkeys.js`, `v` ear / `g` optics / `p` cast | no |
 | Voice in | Web Speech API | **yes — Chrome streams audio to Google** |
 | Voice out | Speech Synthesis | no |
 | Gestures | camera + frame differencing | no |
 | Casting | Presentation API + QR | no |
 | Email | `mailto:` hand-off | no backend, no credentials |
+
+### The reasoning layer
+
+An unrecognised line used to get a canned "that is outside my directive set".
+It now goes to a model, with the directive registry handed over as tools — so
+"how are we looking?" reaches `status`, and a question that is not a directive
+at all gets an answer.
+
+```
+browser ──POST /brain──> forge ──> local model (Ollama by default)
+   │                       │
+   │   reply, or tool calls│
+   └<──────────────────────┘
+   runs the directives, posts the results back
+```
+
+Three things are deliberate:
+
+- **The dashboard runs the tools, not forge.** Directives act on the dashboard —
+  they redraw panels, clear the log, re-hue the interface. So `/brain` is a pure
+  turn: transcript and tools in, a reply or a tool call out. No session store,
+  no expiry, no way for two tabs to corrupt each other.
+- **The tool list comes from the browser.** The registry is the dashboard's;
+  duplicating it in forge would give two lists that drift.
+- **No credential ever reaches the page.** That is the whole reason this sits
+  behind forge. With the default provider the model is local and nothing leaves
+  the machine — unlike the speech path, which streams audio to Google.
+
+Bounded: 4 tool rounds per question, 16 turns of history, 40 messages per
+request. A model that only ever calls tools is cut off and says so.
+
+`brain` reports the provider, model and whether it runs locally; `brain forget`
+clears the conversation. Configure with forge's existing `LLM_PROVIDER` /
+`LLM_MODEL` — the default is `qwen2.5:7b-instruct` on Ollama.
+
+The Anthropic client deliberately **refuses** the tool path with a clear error
+rather than shipping a second, untested envelope; the assistant needs a
+chat-completions provider (Ollama, LM Studio, vLLM, llama.cpp, OpenAI).
 
 ### Gestures
 
@@ -77,12 +117,13 @@ registers.
 
 ## Testing
 
-`npm test` — 29 checks, committed, no external services.
+`npm test` — 43 checks, committed, no external services.
 
 | Suite | Checks | What it covers |
 |---|---|---|
 | `test/gesture-detector.test.mjs` | 17 | swipe classification in all four directions, mirroring, push, still and empty frames, jitter rejection, flailing rejection, cooldown, stroke cut-off, reset, luma weighting |
-| `test/dashboard.test.mjs` | 12 | boot, 3D core mount and brightness, flat-core fallback, context loss, reduced motion, portrait resize, gesture toggle, camera pipeline end to end, hardware release, directives |
+| `test/dashboard.test.mjs` | 26 | boot, 3D core mount and brightness, flat-core fallback, context loss, reduced motion, portrait resize, gesture toggle, camera pipeline end to end, hardware release, directives, the assistant's tool loop against a stubbed forge, and speech interruption |
+| `forge/pipeline/tests/test_brain.py` | 20 | tool-call parsing including malformed arguments, the turn, context folding, and the HTTP surface |
 
 The detector is a separate module (`src/core/gesture-detector.js`) with **no
 imports at all**, so its logic runs in Node in milliseconds with no browser,
@@ -129,9 +170,9 @@ Worth being straight about the gap. What exists is a **command surface** — it
 looks the part, it responds, and every panel is driven by real state. The
 J.A.R.V.I.S. of the films is four things this is not:
 
-1. **Conversational reasoning.** It answers questions it was never programmed
-   for. Here, a directive registry matches known verbs. Closing this means a
-   language model behind the prompt.
+1. **Conversational reasoning.** ✅ *Largely closed.* A local model now sits
+   behind the prompt and calls directives as tools. What is still missing is
+   depth: a 7B model reasons about a small dashboard, not about a network.
 2. **Real telemetry.** It reads actual systems. Here, the figures are
    simulated — except forge, which is real.
 3. **Agency.** It acts in the world: runs analyses, controls hardware. Here,
@@ -139,11 +180,10 @@ J.A.R.V.I.S. of the films is four things this is not:
 4. **Persistent memory.** It remembers across sessions. Here, nothing survives
    a reload except a few browser-local preferences.
 
-The nearest genuine step is (1) plus (2): put a model behind the prompt with
-tool-calls into the directive registry, and point the telemetry at something
-real. Given the day job, that "something real" is the obvious candidate — a
-read-only feed from network tooling would turn the dashboard from a
-convincing prop into an instrument that tells you something you did not know.
+(1) is done. **(2) is now the binding constraint**: the assistant reasons
+fluently over numbers that are invented, so it can only ever roleplay. Point
+the telemetry at a real read-only feed — PRS, NetAct — and the same assistant
+starts answering questions worth asking.
 
 ---
 
@@ -162,6 +202,16 @@ npm run dev
 
 ## Update log
 
+- **2026-09-16** — Put a reasoning layer behind the prompt: a local model via
+  forge, with the directive registry offered as tools and the dashboard running
+  them. Chose local-only and key-behind-forge, so no credential reaches the
+  browser and nothing leaves the machine. Added `converse()` to the
+  chat-completions client, `/brain` to forge's API, and 32 checks across both
+  languages. Found and fixed a pre-existing bug the assistant exposed:
+  `speech.cancel()` cleared the timer that resolved an utterance but never
+  settled its promise, so a second reply arriving before the first finished
+  left `execute()` awaiting for ever and the core stuck on PROCESSING. Typing
+  one directive at a time hid it; running four in a row did not.
 - **2026-09-15 (2)** — Acted on the audit. Built gesture directives by frame
   differencing, with thresholds measured rather than guessed. Committed the
   test harness: 29 checks, `npm test`, no external services. Added CI for both

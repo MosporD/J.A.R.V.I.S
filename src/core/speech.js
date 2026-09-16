@@ -133,6 +133,7 @@ class Speech {
       const finish = () => {
         if (settled) return;
         settled = true;
+        if (this._settle === finish) this._settle = null;
         clearTimeout(this._floor);
         this._floor = null;
         this.speaking = false;
@@ -142,6 +143,10 @@ class Speech {
         resolve();
       };
 
+      // Held on the instance so an interruption can settle this line. Without
+      // it the promise below is the only thing that knows how to finish, and
+      // `cancel()` cannot reach it.
+      this._settle = finish;
       this._floor = setTimeout(finish, estimate);
 
       if (!useVoice) return;
@@ -217,6 +222,16 @@ class Speech {
     clearTimeout(this._floor);
     this._floor = null;
     this.synth?.cancel();
+
+    // An interrupted line still has to settle its promise. Clearing the timer
+    // above removes the only thing that would have resolved it when no speech
+    // engine is present, and `respond()` hands that promise to `execute()` —
+    // so without this, interrupting a reply strands the directive that asked
+    // for it and the core never leaves its processing state.
+    const settle = this._settle;
+    this._settle = null;
+    settle?.();
+
     this.speaking = false;
     this.target = 0;
     if (store.get('mode') === MODE.SPEAKING) store.set('mode', MODE.IDLE);

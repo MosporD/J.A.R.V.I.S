@@ -26,6 +26,21 @@ export function tokenize(line) {
 
 const registry = new Map();
 
+/**
+ * What to try when no directive matches.
+ *
+ * The assistant registers itself here rather than being imported: the command
+ * layer should not have to know a reasoning layer exists, and the assistant
+ * needs this module's registry, so importing the other way would be a cycle.
+ * Returns true when it handled the line.
+ */
+let fallback = null;
+
+export function setFallback(handler) {
+  fallback = handler;
+  return () => { if (fallback === handler) fallback = null; };
+}
+
 export function register(command) {
   registry.set(command.name, command);
   (command.aliases || []).forEach((alias) =>
@@ -557,6 +572,16 @@ export async function execute(line) {
     await new Promise((resolve) => setTimeout(resolve, 260));
     await respond(reply);
     return;
+  }
+
+  // Nothing matched. Before giving up, offer it to the assistant — an
+  // unrecognised line is usually a sentence, not a typo.
+  if (fallback) {
+    try {
+      if (await fallback(raw)) return;
+    } catch (error) {
+      console.error('[command] fallback failed', error);
+    }
   }
 
   audio.error();

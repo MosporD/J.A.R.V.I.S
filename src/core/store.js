@@ -25,6 +25,8 @@ const state = {
   casting: false,         // a presentation session is live
   gesturing: false,       // the camera is open for gesture directives
   motion: 0,              // 0..1 — fraction of the frame currently moving
+  brain: false,           // a reasoning model is reachable through forge
+  brainModel: '',         // which one, for the status rail
   reduceMotion: false,
   threat: 'nominal',      // nominal | elevated | critical
   reactor: 92,            // core output %

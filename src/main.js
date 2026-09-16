@@ -8,6 +8,7 @@ import { execute } from './core/commands.js';
 import { startHotkeys, bindKey } from './core/hotkeys.js';
 import { dictation } from './core/dictation.js';
 import { gestures } from './core/gestures.js';
+import { brain } from './core/brain.js';
 import { cast } from './core/cast.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
@@ -210,6 +211,19 @@ function start() {
     startHotkeys();
   });
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
+  // Ask once whether there is a model to reason with. Never blocking: the
+  // prompt works without one, it just falls back to matching verbs.
+  step('Reasoning layer', () => {
+    brain.probe().then((ready) => {
+      if (ready) {
+        bus.emit('log', {
+          level: 'ok',
+          tag: 'brain',
+          text: `Reasoning layer online — ${brain.model}${brain.local ? ', running locally' : ''}.`,
+        });
+      }
+    });
+  });
 
   dashboard.forEach(mountSafely);
   bindCoreFallback();
@@ -239,7 +253,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, gestures, cast, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, gestures, brain, cast, execute, dashboard };
 }
 
 if (document.readyState === 'loading') {

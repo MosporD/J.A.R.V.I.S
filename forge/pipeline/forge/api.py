@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import db, stages
+from . import brain, db, stages
 from .config import _env
 from .providers import ProviderError, describe
 
@@ -52,6 +52,24 @@ class HarvestBody(BaseModel):
     source: str = Field(..., description="rss | reddit | manual | …")
     topic: str = ""
     items: list[dict[str, Any]]
+
+
+class BrainMessage(BaseModel):
+    """One entry of the transcript, in the chat-completions shape."""
+
+    role: str
+    content: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
+
+
+class BrainBody(BaseModel):
+    # Bounded so a runaway loop in the page cannot walk the model's context up
+    # request by request until the provider starts refusing.
+    messages: list[BrainMessage] = Field(..., max_length=40)
+    tools: list[dict[str, Any]] = Field(default_factory=list, max_length=64)
+    context: dict[str, Any] = Field(default_factory=dict)
 
 
 class ScoreBody(BaseModel):
@@ -228,3 +246,46 @@ def due(limit: int = 10) -> dict:
         "select * from variants where status = 'queued' and scheduled_at <= now() "
         "order by scheduled_at limit %s", (limit,),
     ), "now": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/brain")
+def brain_status() -> dict:
+    """
+    Whether the assistant can answer, without spending a turn to find out.
+
+    The dashboard asks this on start-up so it can say the assistant is offline
+    rather than failing on the operator's first question.
+    """
+    from .config import settings
+
+    choice = settings().llm
+    return {
+        "ready": bool(choice.model),
+        "provider": choice.name,
+        "model": choice.model,
+        "local": choice.is_local,
+    }
+
+
+@app.post("/brain")
+def brain_turn(body: BrainBody) -> dict:
+    """
+    One turn of the assistant.
+
+    Stateless by design: the dashboard owns the transcript and runs the tools,
+    because the directives act on the dashboard. A reply with `tool_calls` is
+    not an answer — it is a request for the caller to run those directives and
+    come back with the results.
+    """
+    if not body.messages:
+        raise HTTPException(status_code=400, detail="messages must not be empty")
+    try:
+        return brain.think(
+            messages=[m.model_dump(exclude_none=True) for m in body.messages],
+            tools=body.tools or None,
+            context=body.context,
+        )
+    except ProviderError as exc:
+        # The provider being down is not this service being broken. 503 lets the
+        # dashboard say "the assistant is unreachable" and keep working.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
