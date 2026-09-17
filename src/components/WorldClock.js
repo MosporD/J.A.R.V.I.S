@@ -2,7 +2,7 @@ import { Component } from '../core/component.js';
 import { store } from '../core/store.js';
 import { palette, alpha } from '../core/theme.js';
 import { fitCanvas } from '../core/canvas.js';
-import { clockTime, stardate, hourIn } from '../core/format.js';
+import { clockTime, stardate, hourIn, localZone } from '../core/format.js';
 import { log, respond } from '../core/commands.js';
 
 /**
@@ -25,7 +25,7 @@ const CITIES = [
 
 export class WorldClock extends Component {
   render() {
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const zone = localZone() ?? 'LOCAL';
 
     this.el.innerHTML = `
       <div class="flex items-end justify-between gap-3">

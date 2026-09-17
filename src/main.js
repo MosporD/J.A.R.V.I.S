@@ -5,6 +5,15 @@ import { store } from './core/store.js';
 import { telemetry } from './core/telemetry.js';
 import { audio, bindInterfaceSounds } from './core/audio.js';
 import { execute } from './core/commands.js';
+import { startHotkeys, bindKey } from './core/hotkeys.js';
+import { dictation } from './core/dictation.js';
+import { cast } from './core/cast.js';
+import { registerSignal, readSignal, signals, startSignalRecorder } from './core/signals.js';
+import { history } from './core/history.js';
+import { restoreTracked } from './core/track.js';
+import { sentinel } from './core/sentinel.js';
+import { installDefaultWatches } from './core/watches.js';
+import { notifier } from './core/notify.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
 import { narrator } from './core/narrator.js';
@@ -14,6 +23,7 @@ import { sigil } from './core/format.js';
 import { Readout } from './core/component.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ArcCore, coreStateLabel } from './components/ArcCore.js';
+import { supportsWebGL } from './core/webgl.js';
 import { Waveform } from './components/Waveform.js';
 import { Diagnostics } from './components/Diagnostics.js';
 import { WorldClock } from './components/WorldClock.js';
@@ -23,6 +33,9 @@ import { LogStream } from './components/LogStream.js';
 import { CommandBar } from './components/CommandBar.js';
 import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
 import { NarrateToggle } from './components/NarrateToggle.js';
+import { ListenToggle } from './components/ListenToggle.js';
+import { CastPanel } from './components/CastPanel.js';
+import { MetricsPanel } from './components/MetricsPanel.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -35,10 +48,13 @@ import { BootSequence } from './components/BootSequence.js';
 
 const dashboard = [
   new LogStream('#logs'),          // first: it must catch every start-up line
+  new BootSequence('#boot'),       // second: the overlay blocks the whole
+                                   // viewport, so it is never a casualty of a
+                                   // panel further down this list failing
   new StatusBar('#statusbar'),
   new Diagnostics('#diagnostics'),
   new PowerGrid('#power'),
-  new ArcCore('#core'),
+  new ArcCore('#core'),            // upgraded to the 3D core below, if it loads
   new Readout('#core-state', {
     keys: ['mode', 'threat'],
     text: (s) => coreStateLabel(s.get('mode'), s.get('threat')),
@@ -51,9 +67,87 @@ const dashboard = [
   new ForgePanel('#forge'),
   new ForgeLink('#forge-link'),
   new NarrateToggle('#narrate-toggle'),
+  new ListenToggle('#listen-toggle'),
   new CommandBar('#command'),
-  new BootSequence('#boot'),       // last: it greets once everything is live
+  new MetricsPanel('#metrics'),
+  new CastPanel('#cast'),
 ];
+
+/**
+ * Mount one panel without letting it take the others with it.
+ *
+ * `forEach` over bare `mount()` calls meant the first panel to throw ended the
+ * loop, so a single unsupported browser API anywhere in this list left every
+ * panel after it unmounted — the boot overlay included, which then sat over the
+ * interface at full opacity forever. A dashboard that loses its radar should
+ * lose its radar, not its start-up sequence.
+ */
+function mountSafely(component) {
+  const id = component.el?.id || component.constructor.name;
+  try {
+    component.mount();
+  } catch (error) {
+    console.error(`[mount] ${id} failed`, error);
+    bus.emit('panel:failed', { id, error });
+    bus.emit('log', {
+      level: 'alert',
+      tag: 'mount',
+      text: `Panel "${id}" failed to initialise — ${error.message}`,
+    });
+  }
+}
+
+/**
+ * Replace whatever is currently drawing the core.
+ *
+ * A canvas keeps the first context type it is given, so swapping between a 2D
+ * and a WebGL core means replacing the element, not just the component.
+ */
+function swapCore(build) {
+  const host = document.querySelector('#core');
+  const stale = host?.querySelector('canvas');
+  const index = dashboard.findIndex((component) => component.el === host);
+  if (!host || !stale || index === -1) return false;
+
+  dashboard[index].destroy();
+  const fresh = document.createElement('canvas');
+  fresh.className = stale.className;
+  fresh.setAttribute('aria-hidden', 'true');
+  stale.replaceWith(fresh);
+  dashboard[index] = build();
+  mountSafely(dashboard[index]);
+  return dashboard[index].mounted;
+}
+
+/**
+ * Load the 3D core in the background and swap it in once it arrives.
+ *
+ * Three.js is by far the largest thing this page can pull, so it is not allowed
+ * to sit between the operator and a working dashboard: the flat core mounts
+ * immediately and the 3D one replaces it only if the machine can render it and
+ * the chunk actually loads. A blocked CDN, a proxy, or no GPU all end the same
+ * way — the flat core, already on screen, simply stays.
+ */
+async function upgradeCore() {
+  if (!supportsWebGL()) {
+    bus.emit('log', { level: 'sys', tag: 'core', text: 'No WebGL on this display — flat core retained.' });
+    return;
+  }
+  try {
+    const { ArcCore3D } = await import('./components/ArcCore3D.js');
+    if (swapCore(() => new ArcCore3D('#core'))) {
+      bus.emit('log', { level: 'ok', tag: 'core', text: 'Reactor housing rendered in three dimensions.' });
+    }
+  } catch (error) {
+    console.error('[core] 3D upgrade failed', error);
+    bus.emit('log', { level: 'warn', tag: 'core', text: `3D core unavailable — ${error.message}` });
+  }
+}
+
+/** Losing the GPU mid-session must not cost the core. */
+function bindCoreFallback() {
+  bus.on('core:fallback', () => swapCore(() => new ArcCore('#core')));
+}
 
 /** Buttons that simply dispatch a directive. */
 function bindQuickActions(root = document) {
@@ -89,21 +183,60 @@ function bindAmbientLog() {
   schedule();
 }
 
+/** Run one piece of start-up wiring, reporting rather than aborting on failure. */
+function step(label, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.error(`[start] ${label} failed`, error);
+    bus.emit('log', {
+      level: 'alert',
+      tag: 'start',
+      text: `${label} failed to start — ${error.message}`,
+    });
+  }
+}
+
 function start() {
-  telemetry.start();
+  // These run before any panel mounts, so an exception in one of them used to
+  // mean nothing mounted at all — boot overlay included.
+  step('Telemetry', () => telemetry.start());
+  // The sentinel reasons over signals the sampler produces, so it starts after
+  // it — and owns alerting and threat posture from here on.
+  // Hand-tracked metrics are signals like any other, so they must be back in
+  // the registry before the sentinel starts looking for them.
+  step('Tracked metrics', () => restoreTracked());
+  step('History', () => {
+    startSignalRecorder();
+    history.prune();
+  });
+  step('Sentinel', () => {
+    installDefaultWatches();
+    sentinel.start();
+  });
+  step('Notifications', () => notifier.start());
   // Optional by design: the workshop runs whether or not the pipeline is up,
   // so this backs off quietly instead of retrying a dead port forever.
-  forge.start();
-  narrator.start();
-  bindInterfaceSounds();
-  bindQuickActions();
-  bindAmbientLog();
+  step('Forge pipeline', () => forge.start());
+  step('Narrator', () => narrator.start());
+  step('Interface audio', () => bindInterfaceSounds());
+  step('Quick actions', () => bindQuickActions());
+  step('Ambient log', () => bindAmbientLog());
+  step('Keyboard shortcuts', () => {
+    bindKey('v', 'Spoken directives on or off', () => dictation.toggle());
+    bindKey('p', 'Cast the dashboard elsewhere', 'cast');
+    bindKey('w', 'List the sentinel watches', 'watch');
+    bindKey('n', 'What happened while you were away', 'brief');
+    startHotkeys();
+  });
+  step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
 
-  store.set('reduceMotion', prefersReducedMotion);
-  dashboard.forEach((component) => component.mount());
+  dashboard.forEach(mountSafely);
+  bindCoreFallback();
+  upgradeCore();
 
   bus.emit('log', { level: 'sys', tag: 'kernel', text: `Session ${sigil()} opened.` });
-  bus.emit('log', { level: 'sys', tag: 'kernel', text: 'Type "help" for the directive index. Press "/" to focus the prompt.' });
+  bus.emit('log', { level: 'sys', tag: 'kernel', text: 'Type "help" for the directive index, "keys" for shortcuts. Press "/" to focus the prompt.' });
 
   if (prefersReducedMotion) {
     bus.emit('log', {
@@ -126,7 +259,11 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, cast, sentinel, notifier, execute, dashboard };
+  // Signal provenance is worth inspecting from the console: `JARVIS.signals.list()`
+  // says which readings are real, and `register` lets a new feed be tried live.
+  window.JARVIS.signals = { register: registerSignal, read: readSignal, list: signals };
+  window.JARVIS.history = history;
 }
 
 if (document.readyState === 'loading') {

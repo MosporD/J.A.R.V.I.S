@@ -411,6 +411,81 @@
   }
 
   /* ---------------------------------------------------------------------
+     Tracked metrics — a stat tile per hand-kept number.
+     ------------------------------------------------------------------ */
+  .metric-tile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--color-hud) 12%, transparent);
+    background: color-mix(in srgb, var(--color-hud) 3%, transparent);
+    transition: border-color 0.2s var(--ease-hud), background 0.2s var(--ease-hud);
+  }
+  .metric-tile:hover {
+    border-color: color-mix(in srgb, var(--color-hud) 30%, transparent);
+    background: color-mix(in srgb, var(--color-hud) 6%, transparent);
+  }
+  .metric-tile[data-alerting="true"] {
+    border-color: color-mix(in srgb, var(--color-alert) 45%, transparent);
+    background: color-mix(in srgb, var(--color-alert) 7%, transparent);
+  }
+
+  /* The trace is recessive; the tile's value is the thing being read. */
+  .metric-spark {
+    flex: none;
+    color: color-mix(in srgb, var(--color-hud) 55%, transparent);
+  }
+  .metric-tile[data-alerting="true"] .metric-spark { color: var(--color-alert); }
+
+  /*
+     Direction is an arrow; colour only once a goal has been declared.
+
+     Its own class rather than `label-hud` with a modifier: `label-hud` is an
+     @utility, so it lands in Tailwind's utilities layer and beats anything
+     written here no matter how specific. Same type treatment, own colour.
+  */
+  .metric-delta {
+    font-family: var(--font-mono);
+    font-size: var(--text-micro);
+    letter-spacing: var(--tracking-hud);
+    text-transform: uppercase;
+    color: var(--color-ink-mute);
+  }
+  .metric-delta[data-tone="good"] { color: var(--color-hud); }
+  .metric-delta[data-tone="bad"]  { color: var(--color-caution); }
+
+  /* ---------------------------------------------------------------------
+     Cast overlay — a modal errand, not a panel in the grid.
+     ------------------------------------------------------------------ */
+  .cast-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--color-void) 82%, transparent);
+    backdrop-filter: blur(3px);
+  }
+  .cast-card {
+    width: min(46rem, 100%);
+    max-height: 90dvh;
+    overflow: auto;
+    border: 1px solid color-mix(in srgb, var(--color-hud) 28%, transparent);
+    background: color-mix(in srgb, var(--color-void) 94%, var(--color-hud));
+    box-shadow: var(--shadow-hud, 0 0 40px -12px rgba(0, 243, 255, 0.5));
+  }
+  .cast-qr {
+    width: min(13rem, 60vw);
+    padding: 0.6rem;
+    background: color-mix(in srgb, var(--color-void) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-hud) 22%, transparent);
+  }
+  .cast-qr svg { display: block; width: 100%; height: auto; }
+  [data-cast-note][data-tone="warn"] { color: var(--color-caution); }
+
+  /* ---------------------------------------------------------------------
      Boot overlay.
      ------------------------------------------------------------------ */
   .boot {

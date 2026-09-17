@@ -32,6 +32,77 @@
       <div class="fx-vignette"></div>
     </div>
 
+
+    <!-- ══ START-UP FAILSAFE ═══════════════════════════════════════════════
+         Deliberately a classic inline script, not a module. The boot overlay is
+         fixed, opaque and covers the viewport, so anything that stops the app
+         from marking it done leaves the operator staring at "INITIALISING"
+         with no way through and no idea why — including the case where the
+         module graph itself fails to evaluate and main.js never runs at all.
+         This runs regardless, records whatever went wrong, and always offers a
+         way into the interface. -->
+    <script>
+      (function () {
+        var STALL_MS = 6000;
+        var faults = [];
+
+        function record(message) {
+          if (message && faults.indexOf(message) === -1) faults.push(message);
+        }
+
+        // Capture phase, because a stylesheet or module that fails to load
+        // fires its error event on the element, not on window, and never
+        // reaches a bubbling handler. That is exactly how a build error
+        // arrives: the script 500s and no exception is ever thrown.
+        window.addEventListener('error', function (event) {
+          var target = event.target;
+          if (target && target !== window && target.tagName) {
+            record(
+              'Failed to load ' + target.tagName.toLowerCase() + ': ' +
+              (target.src || target.href || '(unknown source)'),
+            );
+            return;
+          }
+          var where = event.filename
+            ? ' (' + String(event.filename).split('/').pop() + ':' + event.lineno + ')'
+            : '';
+          record((event.message || 'Script error') + where);
+        }, true);
+
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          record('Unhandled rejection: ' + ((reason && reason.message) || reason));
+        });
+
+        function dismiss() {
+          var boot = document.getElementById('boot');
+          if (boot) boot.dataset.done = 'true';
+        }
+
+        document.addEventListener('click', function (event) {
+          var target = event.target;
+          if (target && target.closest && target.closest('[data-boot-dismiss]')) dismiss();
+        });
+
+        setTimeout(function () {
+          var boot = document.getElementById('boot');
+          if (!boot || boot.dataset.done === 'true') return;
+
+          var panel = boot.querySelector('[data-boot-fault]');
+          var text = boot.querySelector('[data-boot-fault-text]');
+          if (text) {
+            text.textContent = (faults.length
+              ? faults.join('\n')
+              : 'No error reached the page.'
+            ) + '\n\nCheck the browser console, and the terminal running the dev server — '
+              + 'a build or stylesheet error is reported there, not here.';
+          }
+          if (panel) panel.hidden = false;
+          console.error('[failsafe] start-up stalled after ' + STALL_MS + 'ms', faults);
+        }, STALL_MS);
+      })();
+    </script>
+
     <!-- ══ BOOT SEQUENCE ═══════════════════════════════════════════════ -->
     <div id="boot" class="boot" data-done="false" role="status" aria-live="polite">
       <div class="w-[min(560px,88vw)] px-6">
@@ -57,6 +128,45 @@
           <div class="mt-3 flex items-center justify-between">
             <span class="label-hud">SERIAL <span data-boot-serial>——</span></span>
             <span class="label-hud animate-breathe">PRESS ANY KEY TO SKIP</span>
+          </div>
+        </div>
+
+        <!-- Shown only by the failsafe below, when start-up stalls. -->
+        <div class="mt-6 border border-dashed p-3" data-boot-fault hidden
+             style="border-color: color-mix(in srgb, var(--color-alert) 45%, transparent)">
+          <div class="label-hud" style="color: var(--color-alert)">START-UP DID NOT COMPLETE</div>
+          <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[0.6875rem] text-ink-dim"
+               data-boot-fault-text></pre>
+          <button class="btn-hud mt-3" type="button" data-boot-dismiss>CONTINUE TO INTERFACE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CAST OVERLAY ════════════════════════════════════════════════ -->
+    <div id="cast" class="cast-overlay" data-open="false" role="dialog" aria-modal="true"
+         aria-labelledby="cast-title" hidden>
+      <div class="cast-card">
+        <div class="panel-head">
+          <span class="led" data-tone="ok"></span>
+          <h2 class="panel-title" id="cast-title">Cast Interface</h2>
+          <button class="btn-hud ml-auto" type="button" data-cast-dismiss aria-label="Close">CLOSE</button>
+        </div>
+
+        <div class="panel-body grid gap-4 sm:grid-cols-[auto_1fr]">
+          <div class="cast-qr mx-auto text-hud" data-cast-qr></div>
+
+          <div class="min-w-0">
+            <div class="label-hud">ADDRESS</div>
+            <div class="mt-1 break-all font-mono text-[0.75rem] text-ink" data-cast-url>—</div>
+
+            <p class="mt-3 font-mono text-[0.6875rem] leading-relaxed text-ink-dim"
+               data-cast-note data-tone="ok"></p>
+
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button class="btn-hud" type="button" data-cast-device aria-pressed="false">CAST TO DEVICE</button>
+              <button class="btn-hud" type="button" data-cast-detach>DETACHED WINDOW</button>
+              <button class="btn-hud" type="button" data-cast-copy>COPY ADDRESS</button>
+            </div>
           </div>
         </div>
       </div>
@@ -121,6 +231,16 @@
             <button
               class="btn-hud"
               type="button"
+              data-command="listen toggle"
+              id="listen-toggle"
+              aria-pressed="false"
+              title="Spoken directives — listen for commands through the microphone"
+            >
+              EAR OFF
+            </button>
+            <button
+              class="btn-hud"
+              type="button"
               data-command="narrate cycle"
               id="narrate-toggle"
               aria-pressed="true"
@@ -144,6 +264,15 @@
               <span class="panel-index ml-auto">01 / SYS</span>
             </div>
             <div class="panel-body flex flex-1 flex-col" id="diagnostics"></div>
+          </section>
+
+          <section class="panel panel-bracket shrink-0" id="metrics" aria-labelledby="metrics-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="metrics-title">Tracked Metrics</h2>
+              <span class="panel-index ml-auto" data-metrics-count>0 / TRK</span>
+            </div>
+            <div class="panel-body space-y-1.5" data-metrics-body></div>
           </section>
 
           <section class="panel panel-bracket shrink-0" aria-labelledby="forge-title">

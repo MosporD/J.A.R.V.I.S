@@ -52,9 +52,6 @@ export class Ring {
 const HISTORY = 96;
 const SAMPLE_HZ = 4;
 
-/** How long a hand-raised alert keeps the interface on edge. */
-const MANUAL_ALERT_MS = 20000;
-
 /**
  * Each channel walks toward a drifting target instead of jumping, so the
  * sparklines read as instrumentation rather than noise.
@@ -123,8 +120,6 @@ class Telemetry {
     this.heap = null;
 
     this._accum = 0;
-    this._raised = new Set();
-    this._manual = null;
   }
 
   start() {
@@ -137,14 +132,6 @@ class Telemetry {
       b.addEventListener('levelchange', read);
       b.addEventListener('chargingchange', read);
     }).catch(() => {});
-
-    // An alert raised by hand (or by a diagnostic sweep) colours the interface
-    // too, for a while. Without this the threat state would be recomputed from
-    // the thresholds a quarter-second later and the alert would vanish.
-    bus.on('alert', ({ level, source }) => {
-      if (this.channels.has(source)) return; // threshold alerts are handled below
-      this._manual = { level, until: Date.now() + MANUAL_ALERT_MS };
-    });
 
     // Working state costs cycles — reflect that in the traces.
     store.watch('mode', (mode) => {
@@ -188,41 +175,9 @@ class Telemetry {
     // Keep the reactor readout and the arc output channel in agreement.
     store.set('reactor', Math.round(metrics.pwr));
 
-    this.evaluate(metrics);
+    // Alerting and threat posture belong to the sentinel, which can reason about
+    // a condition over time. This only reports the numbers.
     bus.emit('telemetry', { metrics, channels: this.channels, self: this });
-  }
-
-  /** Threshold watch — the only source of automatic alerts. */
-  evaluate(metrics) {
-    const rules = [
-      ['cpu', 88, 'warn', 'CPU LOAD ABOVE SAFE ENVELOPE'],
-      ['thm', 74, 'warn', 'CORE TEMPERATURE RISING'],
-      ['mem', 90, 'warn', 'MEMORY PRESSURE CRITICAL'],
-      ['pwr', 70, 'alert', 'ARC OUTPUT BELOW MINIMUM', true],
-    ];
-
-    for (const [id, limit, level, title, below] of rules) {
-      const breached = below ? metrics[id] < limit : metrics[id] > limit;
-      const key = `${id}:${level}`;
-      if (breached && !this._raised.has(key)) {
-        this._raised.add(key);
-        bus.emit('alert', {
-          level,
-          title,
-          note: `${this.channels.get(id).label} ${metrics[id].toFixed(1)}${this.channels.get(id).unit}`,
-          source: id,
-        });
-      } else if (!breached) {
-        this._raised.delete(key);
-      }
-    }
-
-    if (this._manual && Date.now() > this._manual.until) this._manual = null;
-
-    const critical =
-      this._manual?.level === 'alert' || [...this._raised].some((k) => k.endsWith('alert'));
-    const elevated = Boolean(this._manual) || this._raised.size > 0;
-    store.set('threat', critical ? 'critical' : elevated ? 'elevated' : 'nominal');
   }
 
   get(id) {
