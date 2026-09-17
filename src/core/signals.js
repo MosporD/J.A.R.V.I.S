@@ -1,4 +1,5 @@
 import { store } from './store.js';
+import { history } from './history.js';
 import { telemetry } from './telemetry.js';
 import { ticker } from './ticker.js';
 
@@ -36,6 +37,11 @@ const registry = new Map();
 export function registerSignal(spec) {
   registry.set(spec.id, { unit: '', note: '', ...spec });
   return spec.id;
+}
+
+/** Remove a signal — a metric you stop tracking must stop being readable. */
+export function unregisterSignal(id) {
+  return registry.delete(id);
 }
 
 export function signal(id) {
@@ -134,3 +140,28 @@ registerSignal({
   note: 'The real online/offline state.',
   read: () => (store.get('online') ? 1 : 0),
 });
+
+
+/**
+ * Write measured signals into the history store on a slow cadence.
+ *
+ * Deliberately slow, and deliberately measured-only. A sample a minute is
+ * plenty to see a day's shape, and recording the synthetic channels would fill
+ * the database with a random walk — expensive noise that makes every later
+ * query slower without making any answer truer.
+ */
+const RECORD_EVERY_MS = 60_000;
+
+export function startSignalRecorder({ everyMs = RECORD_EVERY_MS } = {}) {
+  const tick = () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    for (const source of registry.values()) {
+      if (source.provenance !== PROVENANCE.MEASURED) continue;
+      const value = readSignal(source.id);
+      if (value !== null) history.append(source.id, value);
+    }
+  };
+  tick();
+  const id = setInterval(tick, everyMs);
+  return () => clearInterval(id);
+}
