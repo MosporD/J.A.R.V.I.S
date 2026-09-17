@@ -35,6 +35,7 @@ import { ForgePanel, ForgeLink } from './components/ForgePanel.js';
 import { NarrateToggle } from './components/NarrateToggle.js';
 import { ListenToggle } from './components/ListenToggle.js';
 import { CastPanel } from './components/CastPanel.js';
+import { MetricsPanel } from './components/MetricsPanel.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -68,6 +69,7 @@ const dashboard = [
   new NarrateToggle('#narrate-toggle'),
   new ListenToggle('#listen-toggle'),
   new CommandBar('#command'),
+  new MetricsPanel('#metrics'),
   new CastPanel('#cast'),
 ];
 

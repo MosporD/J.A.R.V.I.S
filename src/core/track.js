@@ -89,6 +89,7 @@ export async function record(name, value, { unit = '', at = Date.now(), note = '
   definitions[id] = {
     label: existing?.label ?? String(name).trim().toUpperCase(),
     unit: unit || existing?.unit || '',
+    goal: existing?.goal ?? null,          // 'up' | 'down' — which way is good
     last: value,
     lastAt: at,
     count: (existing?.count ?? 0) + 1,
@@ -139,7 +140,7 @@ function ago(at) {
 register({
   name: 'track',
   aliases: ['metric'],
-  summary: 'Record a number by hand — track <name> <value> [unit] | list | show <name> | forget <name>.',
+  summary: 'Record a number by hand — track <name> <value> [unit] | list | show | goal | forget.',
   async run(args) {
     const verb = (args[0] || 'list').toLowerCase();
 
@@ -158,6 +159,33 @@ register({
         );
       }
       return respond(`${metrics.length} metric${metrics.length === 1 ? '' : 's'} tracked, sir.`);
+    }
+
+    if (verb === 'goal') {
+      const id = slug(args[1] || '');
+      const want = (args[2] || '').toLowerCase();
+      if (!definitions[id]) {
+        log(`Not tracked: ${args[1]}`, 'warn', 'track');
+        return Promise.resolve();
+      }
+      if (!['up', 'down', 'none'].includes(want)) {
+        log('Usage: track goal <name> up | down | none', 'warn', 'track');
+        return Promise.resolve();
+      }
+      // Which direction is good is yours to state. Nothing guesses it: up is
+      // good for cash and bad for weight, and colouring one like the other is
+      // worse than staying neutral.
+      definitions[id].goal = want === 'none' ? null : want;
+      persist();
+      bus.emit('track:record', { id, value: definitions[id].last, at: Date.now() });
+      log(
+        want === 'none'
+          ? `${definitions[id].label}: no direction preference.`
+          : `${definitions[id].label}: ${want} is good.`,
+        'ok',
+        'track',
+      );
+      return Promise.resolve();
     }
 
     if (verb === 'forget') {

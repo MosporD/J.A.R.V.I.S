@@ -1,6 +1,8 @@
 import { sentinel } from './sentinel.js';
 import { signal, PROVENANCE, signals } from './signals.js';
 import { register, log, respond } from './commands.js';
+import { slug } from './track.js';
+import { readLocalJSON, writeLocalJSON } from './storage.js';
 import { duration } from './format.js';
 
 /**
@@ -102,8 +104,19 @@ const DEFAULTS = [
   },
 ];
 
+const CUSTOM_KEY = 'jarvis.watches';
+
+/** A threshold you set by hand must survive a reload; the defaults are code. */
+function saveCustom() {
+  const builtIn = new Set(DEFAULTS.map((rule) => rule.id));
+  const custom = sentinel.list().filter((rule) => !builtIn.has(rule.id));
+  writeLocalJSON(CUSTOM_KEY, custom);
+}
+
 export function installDefaultWatches() {
   DEFAULTS.forEach((rule) => sentinel.add(rule));
+  const custom = readLocalJSON(CUSTOM_KEY, []);
+  if (Array.isArray(custom)) custom.forEach((rule) => sentinel.add(rule));
   sentinel.applySaved();
   return sentinel;
 }
@@ -120,7 +133,7 @@ function mark(signalId) {
 register({
   name: 'watch',
   aliases: ['watches', 'sentinel'],
-  summary: 'The sentinel — list | arm <id> | disarm <id> | test <id> | signals.',
+  summary: 'The sentinel — list | add | remove | arm | disarm | test | signals.',
   run(args) {
     const verb = (args[0] || 'list').toLowerCase();
     const id = args[1];
@@ -133,6 +146,54 @@ register({
         if (source.note) log(`       ${source.note}`, 'sys', 'watch');
       }
       return respond('Signal provenance displayed, sir.');
+    }
+
+    if (verb === 'add') {
+      // watch add <signal> above|below <value> [severity]
+      const [, target, op, rawValue, severity = 'warn'] = args;
+      const signalId = target?.startsWith('track:') || signal(target) ? target : `track:${slug(target || '')}`;
+
+      if (!signal(signalId)) {
+        log(`No signal called "${target}". Try: watch signals`, 'warn', 'watch');
+        return Promise.resolve();
+      }
+      if (!['above', 'below'].includes(op)) {
+        log('Usage: watch add <signal> above|below <value> [warn|alert]', 'warn', 'watch');
+        return Promise.resolve();
+      }
+      const value = Number.parseFloat(rawValue);
+      if (!Number.isFinite(value)) {
+        log(`"${rawValue}" is not a number.`, 'warn', 'watch');
+        return Promise.resolve();
+      }
+
+      const id = `${signalId.replace(/[^a-z0-9]+/gi, '-')}-${op}`.toLowerCase();
+      const source = signal(signalId);
+      sentinel.add({
+        id,
+        label: `${source.label} ${op.toUpperCase()} ${value}${source.unit ? ` ${source.unit}` : ''}`,
+        signal: signalId,
+        op,
+        value,
+        for: 0,
+        cooldown: 3600,
+        severity: severity === 'alert' ? 'alert' : 'warn',
+        advice: 'Threshold you set.',
+      });
+      saveCustom();
+      log(`Watching ${source.label} ${op} ${value}. Id: ${id}`, 'ok', 'watch');
+      return respond(`I will tell you when ${source.label.toLowerCase()} goes ${op} ${value}.`);
+    }
+
+    if (verb === 'remove' || verb === 'delete') {
+      if (!sentinel.rules.has(id)) {
+        log(`No watch called "${id}".`, 'warn', 'watch');
+        return Promise.resolve();
+      }
+      sentinel.remove(id);
+      saveCustom();
+      log(`Removed ${id}.`, 'ok', 'watch');
+      return Promise.resolve();
     }
 
     if (verb === 'arm' || verb === 'disarm') {
