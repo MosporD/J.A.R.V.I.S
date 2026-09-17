@@ -38,6 +38,7 @@ import { NarrateToggle } from './components/NarrateToggle.js';
 import { ListenToggle } from './components/ListenToggle.js';
 import { GestureToggle } from './components/GestureToggle.js';
 import { CastPanel } from './components/CastPanel.js';
+import { MetricsPanel } from './components/MetricsPanel.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -72,6 +73,7 @@ const dashboard = [
   new ListenToggle('#listen-toggle'),
   new GestureToggle('#gesture-toggle'),
   new CommandBar('#command'),
+  new MetricsPanel('#metrics'),
   new CastPanel('#cast'),
 ];
 
