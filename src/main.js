@@ -8,6 +8,10 @@ import { execute } from './core/commands.js';
 import { startHotkeys, bindKey } from './core/hotkeys.js';
 import { dictation } from './core/dictation.js';
 import { cast } from './core/cast.js';
+import { registerSignal, readSignal, signals } from './core/signals.js';
+import { sentinel } from './core/sentinel.js';
+import { installDefaultWatches } from './core/watches.js';
+import { notifier } from './core/notify.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
 import { narrator } from './core/narrator.js';
@@ -193,6 +197,13 @@ function start() {
   // These run before any panel mounts, so an exception in one of them used to
   // mean nothing mounted at all — boot overlay included.
   step('Telemetry', () => telemetry.start());
+  // The sentinel reasons over signals the sampler produces, so it starts after
+  // it — and owns alerting and threat posture from here on.
+  step('Sentinel', () => {
+    installDefaultWatches();
+    sentinel.start();
+  });
+  step('Notifications', () => notifier.start());
   // Optional by design: the workshop runs whether or not the pipeline is up,
   // so this backs off quietly instead of retrying a dead port forever.
   step('Forge pipeline', () => forge.start());
@@ -203,6 +214,8 @@ function start() {
   step('Keyboard shortcuts', () => {
     bindKey('v', 'Spoken directives on or off', () => dictation.toggle());
     bindKey('p', 'Cast the dashboard elsewhere', 'cast');
+    bindKey('w', 'List the sentinel watches', 'watch');
+    bindKey('n', 'What happened while you were away', 'brief');
     startHotkeys();
   });
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
@@ -235,7 +248,10 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, cast, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, cast, sentinel, notifier, execute, dashboard };
+  // Signal provenance is worth inspecting from the console: `JARVIS.signals.list()`
+  // says which readings are real, and `register` lets a new feed be tried live.
+  window.JARVIS.signals = { register: registerSignal, read: readSignal, list: signals };
 }
 
 if (document.readyState === 'loading') {
