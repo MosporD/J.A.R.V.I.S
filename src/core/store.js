@@ -27,6 +27,8 @@ const state = {
   motion: 0,              // 0..1 — fraction of the frame currently moving
   brain: false,           // a reasoning model is reachable through forge
   brainModel: '',         // which one, for the status rail
+  notify: false,          // desktop notifications armed
+  sentinelActive: 0,      // watches currently raised
   reduceMotion: false,
   threat: 'nominal',      // nominal | elevated | critical
   reactor: 92,            // core output %
