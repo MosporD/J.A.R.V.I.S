@@ -10,7 +10,9 @@ import { dictation } from './core/dictation.js';
 import { gestures } from './core/gestures.js';
 import { brain } from './core/brain.js';
 import { cast } from './core/cast.js';
-import { registerSignal, readSignal, signals } from './core/signals.js';
+import { registerSignal, readSignal, signals, startSignalRecorder } from './core/signals.js';
+import { history } from './core/history.js';
+import { restoreTracked } from './core/track.js';
 import { sentinel } from './core/sentinel.js';
 import { installDefaultWatches } from './core/watches.js';
 import { notifier } from './core/notify.js';
@@ -203,6 +205,13 @@ function start() {
   step('Telemetry', () => telemetry.start());
   // The sentinel reasons over signals the sampler produces, so it starts after
   // it — and owns alerting and threat posture from here on.
+  // Hand-tracked metrics are signals like any other, so they must be back in
+  // the registry before the sentinel starts looking for them.
+  step('Tracked metrics', () => restoreTracked());
+  step('History', () => {
+    startSignalRecorder();
+    history.prune();
+  });
   step('Sentinel', () => {
     installDefaultWatches();
     sentinel.start();
@@ -270,6 +279,7 @@ function start() {
   // Signal provenance is worth inspecting from the console: `JARVIS.signals.list()`
   // says which readings are real, and `register` lets a new feed be tried live.
   window.JARVIS.signals = { register: registerSignal, read: readSignal, list: signals };
+  window.JARVIS.history = history;
 }
 
 if (document.readyState === 'loading') {
