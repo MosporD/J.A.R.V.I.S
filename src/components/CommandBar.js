@@ -2,6 +2,7 @@ import { Component } from '../core/component.js';
 import { store, MODE } from '../core/store.js';
 import { audio } from '../core/audio.js';
 import { execute, completions, catalogue } from '../core/commands.js';
+import { readLocalJSON, writeLocalJSON } from '../core/storage.js';
 
 const HISTORY_KEY = 'jarvis.history';
 const HISTORY_MAX = 50;
@@ -57,6 +58,18 @@ export class CommandBar extends Component {
       });
     }
 
+    // Live feedback while dictating — but never over something being typed.
+    this.on('dictation:interim', ({ text }) => {
+      if (document.activeElement === this.input) return;
+      this.input.value = text;
+      this.onInput();
+    });
+    this.on('dictation:final', () => {
+      if (document.activeElement === this.input) return;
+      this.input.value = '';
+      this.onInput();
+    });
+
     this.watch('mode', (mode) => {
       this.busy = mode === MODE.PROCESSING;
       this.input.setAttribute('aria-busy', String(this.busy));
@@ -67,26 +80,20 @@ export class CommandBar extends Component {
   }
 
   loadHistory() {
-    try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [];
-    } catch {
-      return [];
-    }
+    const saved = readLocalJSON(HISTORY_KEY, []);
+    return Array.isArray(saved) ? saved : [];
   }
 
   saveHistory() {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history.slice(-HISTORY_MAX)));
-    } catch {
-      /* storage unavailable — history simply does not persist */
-    }
+    // Storage unavailable simply means history does not persist.
+    writeLocalJSON(HISTORY_KEY, this.history.slice(-HISTORY_MAX));
   }
 
   /** A curated opening set — alphabetical order is not a recommendation. */
   renderHint() {
     if (!this.hint) return;
     const known = new Set(catalogue().map((c) => c.name));
-    const suggested = ['status', 'diag', 'scan', 'locate', 'theme', 'say']
+    const suggested = ['status', 'diag', 'scan', 'locate', 'email', 'say']
       .filter((name) => known.has(name));
     this.hint.textContent = `TRY · ${suggested.join(' · ')}`;
   }

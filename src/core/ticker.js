@@ -82,7 +82,17 @@ class Ticker {
 
 export const ticker = new Ticker();
 
-/** True when the operating system asks for reduced motion. */
-export const prefersReducedMotion = window.matchMedia(
-  '(prefers-reduced-motion: reduce)',
-).matches;
+/**
+ * True when the operating system asks for reduced motion.
+ *
+ * Evaluated at module scope, so an environment without `matchMedia` — or one
+ * that refuses the query — would otherwise fail the whole module graph and take
+ * the interface with it. Assume full motion when the browser will not say.
+ */
+export const prefersReducedMotion = (() => {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+})();

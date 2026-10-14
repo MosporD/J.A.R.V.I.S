@@ -20,6 +20,11 @@ const state = {
   sfx: true,
   mic: false,
   voice: true,
+  narrate: 'alerts',      // off | alerts | all — what the log reads aloud
+  dictating: false,       // spoken directives being listened for
+  casting: false,         // a presentation session is live
+  gesturing: false,       // the camera is open for gesture directives
+  motion: 0,              // 0..1 — fraction of the frame currently moving
   reduceMotion: false,
   threat: 'nominal',      // nominal | elevated | critical
   reactor: 92,            // core output %

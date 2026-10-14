@@ -1,0 +1,91 @@
+{
+  "name": "forge \u00b7 collect metrics",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expressionValue": "0 23 * * *"
+            }
+          ]
+        }
+      },
+      "id": "b5e29984-02fd-471f-993f-854842f2f326",
+      "name": "Daily 23:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Replace with real platform analytics calls \u2014 this is where your YouTube\n// Data API / TikTok / Instagram credentials belong, not in the pipeline.\n// Shape expected by /metrics:\n//   { platform, external_id, views, likes, comments, shares, watch_seconds }\nreturn [{ json: { readings: [] } }];"
+      },
+      "id": "8663f902-cdad-4670-91e1-6d8e3d43a5fe",
+      "name": "Fetch readings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://forge-api:8000/metrics",
+        "options": {
+          "timeout": 900000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ readings: $json.readings }) }}"
+      },
+      "id": "cb76add0-5e3d-4425-b225-c374dca58a40",
+      "name": "Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 23:00": {
+      "main": [
+        [
+          {
+            "node": "Fetch readings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch readings": {
+      "main": [
+        [
+          {
+            "node": "Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

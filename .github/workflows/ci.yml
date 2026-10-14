@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A new push to the same branch supersedes the run in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dashboard:
+    name: Dashboard — build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only Chromium. The suite drives one browser and the other two would
+      # double the minutes for nothing.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `pretest` builds, so this covers the build as well. The 3D core is
+      # rendered through SwiftShader, since a CI runner has no GPU.
+      - name: Build and test
+        run: npm test
+
+  forge:
+    name: forge — pipeline tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: forge/pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            forge/pipeline/requirements.txt
+            forge/pipeline/requirements-render.txt
+
+      # The render tests skip without it, which hides most of the suite.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-render.txt pytest
+
+      # The database tests stay skipped: they want a live Postgres, and
+      # standing one up is a larger decision than this workflow should make.
+      - name: Test
+        run: python -m pytest -q

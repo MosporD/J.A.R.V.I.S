@@ -19,6 +19,9 @@ import { clamp } from './format.js';
  * identically whether or not the operator can actually hear anything.
  */
 
+/** Pending narration lines held at once; older ones are dropped. */
+const MAX_QUEUE = 6;
+
 const PREFERRED_VOICES = [
   /Daniel/i,        // macOS en-GB
   /Google UK English Male/i,
@@ -36,6 +39,8 @@ class Speech {
     this.speaking = false;
     this._floor = null;
     this._stopTicker = null;
+    this._queue = [];
+    this._draining = false;
 
     if (this.synth) {
       const pick = () => this.pickVoice();
@@ -72,7 +77,44 @@ class Speech {
    * and is only stood down once a boundary event proves a real voice is
    * carrying the line — at which point `onend` becomes the source of truth.
    */
-  speak(text, { rate = 1.02, pitch = 0.92 } = {}) {
+  speak(text, options = {}) {
+    // Dialogue outranks narration: a reply the operator just asked for should
+    // not wait behind a queue of event lines describing older events.
+    this._queue.length = 0;
+    return this._utter(text, options);
+  }
+
+  /**
+   * Speak a line once whatever is already speaking has finished.
+   *
+   * `speak` interrupts, which is right for dialogue — the newest reply is the
+   * one that matters. Narration is the opposite: each line describes an event
+   * that already happened, so cutting one off mid-word loses it entirely. A
+   * burst of log lines has to be read in order, not collapsed into the last.
+   */
+  enqueue(text, options = {}) {
+    const clean = String(text).replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+
+    // Bounded on purpose. A flood of lines should drop its own backlog rather
+    // than commit the interface to minutes of speech about stale events.
+    if (this._queue.length >= MAX_QUEUE) this._queue.shift();
+    this._queue.push({ text: clean, options });
+    this._drain();
+  }
+
+  async _drain() {
+    if (this._draining) return;
+    this._draining = true;
+    while (this._queue.length) {
+      const job = this._queue.shift();
+      // eslint-disable-next-line no-await-in-loop
+      await this._utter(job.text, job.options);
+    }
+    this._draining = false;
+  }
+
+  _utter(text, { rate = 1.02, pitch = 0.92 } = {}) {
     const clean = String(text).replace(/\s+/g, ' ').trim();
     if (!clean) return Promise.resolve();
 
@@ -170,7 +212,8 @@ class Speech {
     });
   }
 
-  cancel() {
+  cancel({ clearQueue = false } = {}) {
+    if (clearQueue) this._queue.length = 0;
     clearTimeout(this._floor);
     this._floor = null;
     this.synth?.cancel();

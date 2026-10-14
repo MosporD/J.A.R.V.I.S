@@ -1,0 +1,29 @@
+# Only n8n and NocoDB are meant to be reachable from a browser; everything else
+# talks over the compose network. Set FORGE_DOMAIN to a real hostname and Caddy
+# provisions TLS on its own — leave it as :80 and it serves plain HTTP locally.
+
+{$FORGE_DOMAIN::80} {
+	encode gzip
+
+	handle_path /n8n* {
+		reverse_proxy n8n:5678
+	}
+
+	handle_path /db* {
+		reverse_proxy nocodb:8080
+	}
+
+	# The API is the one surface a J.A.R.V.I.S panel needs. Read-only endpoints
+	# only — the stage endpoints stay inside the network.
+	handle /api/health {
+		reverse_proxy forge-api:8000/health
+	}
+
+	handle /api/pipeline {
+		reverse_proxy forge-api:8000/pipeline
+	}
+
+	handle {
+		respond "forge" 200
+	}
+}

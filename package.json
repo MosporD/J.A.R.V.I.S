@@ -3,15 +3,24 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "J.A.R.V.I.S. — a holographic sci-fi command dashboard.",
+  "description": "J.A.R.V.I.S. \u2014 a holographic sci-fi command dashboard.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4173"
+    "preview": "vite preview --port 4173",
+    "pretest": "vite build",
+    "test": "node --test --test-concurrency=1 test/gesture-detector.test.mjs test/dashboard.test.mjs",
+    "test:unit": "node --test test/gesture-detector.test.mjs",
+    "test:browser": "node --test --test-concurrency=1 test/dashboard.test.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4.3.3",
     "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "qrcode-generator": "^2.0.4",
+    "three": "^0.186.0"
   }
 }

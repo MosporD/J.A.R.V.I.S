@@ -2,9 +2,34 @@
 
 export const pad = (n, width = 2) => String(Math.floor(n)).padStart(width, '0');
 
+/**
+ * `Intl.DateTimeFormat` throws a RangeError on a time zone the platform does
+ * not carry, and a browser built against a trimmed ICU carries very few. Every
+ * clock in the HUD goes through here so an unknown zone degrades to local time
+ * instead of taking the panel — and, before the mount loop was isolated, the
+ * whole interface — down with it.
+ */
+function formatter(options) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', options);
+  } catch {
+    const { timeZone, ...rest } = options;
+    return new Intl.DateTimeFormat('en-GB', rest);
+  }
+}
+
+/** The browser's own zone, or null when it declines to name one. */
+export function localZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 /** 14:07:32 — the HUD clock format. */
 export function clockTime(date = new Date(), timeZone) {
-  const parts = new Intl.DateTimeFormat('en-GB', {
+  const parts = formatter({
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -17,7 +42,7 @@ export function clockTime(date = new Date(), timeZone) {
 
 /** SAT 19 AUG 2026 */
 export function stardate(date = new Date(), timeZone) {
-  return new Intl.DateTimeFormat('en-GB', {
+  return formatter({
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -32,7 +57,7 @@ export function stardate(date = new Date(), timeZone) {
 /** Hour 0-23 in a given zone — used for the day/night indicator. */
 export function hourIn(timeZone, date = new Date()) {
   return Number(
-    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone })
+    formatter({ hour: '2-digit', hour12: false, timeZone })
       .format(date)
       .slice(0, 2),
   );

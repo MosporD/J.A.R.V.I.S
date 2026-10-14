@@ -1,5 +1,6 @@
 import { bus } from './bus.js';
 import { store } from './store.js';
+import { readLocal, writeLocal } from './storage.js';
 
 /**
  * Synthesised interface audio.
@@ -21,7 +22,7 @@ class AudioEngine {
     this.master = null;
     this.analyser = null;
     this.micStream = null;
-    this.enabled = localStorage.getItem(STORAGE_KEY) !== 'off';
+    this.enabled = readLocal(STORAGE_KEY) !== 'off';
     this._data = null;
     this._level = 0;
     store.set('sfx', this.enabled);
@@ -83,7 +84,7 @@ class AudioEngine {
 
   setEnabled(on) {
     this.enabled = on;
-    localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off');
+    writeLocal(STORAGE_KEY, on ? 'on' : 'off');
     store.set('sfx', on);
     if (on) {
       this.init();
