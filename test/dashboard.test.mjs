@@ -167,6 +167,41 @@ test('the gesture directive lists its bindings', async () => {
   await page.close();
 });
 
+// These two cover a hang, not a wrong answer. `respond()` is awaited by
+// `execute()`, and an utterance's floor timer is its only resolver on a machine
+// with no installed voices — every CI runner. A `cancel` that cleared the timer
+// without settling left the directive that started it awaiting a promise that
+// would never resolve, which is a test run that never ends rather than fails.
+test('cancelling mid-sentence settles the awaiting directive', async () => {
+  const { page } = await openDashboard(browser, { url: URL });
+  const settled = await page.evaluate(async () => {
+    const speech = window.JARVIS.speech;
+    let done = false;
+    speech.speak('A long enough line that its floor timer is still pending.')
+      .then(() => { done = true; });
+    await new Promise((r) => setTimeout(r, 150));
+    speech.cancel();                       // what the VOX toggle does
+    await new Promise((r) => setTimeout(r, 500));
+    return done;
+  });
+  assert.ok(settled, 'cancel() must resolve the utterance it interrupts');
+  await page.close();
+});
+
+test('an interrupting reply settles the one it cut off', async () => {
+  const { page } = await openDashboard(browser, { url: URL });
+  const settled = await page.evaluate(async () => {
+    const speech = window.JARVIS.speech;
+    let first = false;
+    speech.speak('The first reply, which gets interrupted.').then(() => { first = true; });
+    await new Promise((r) => setTimeout(r, 150));
+    await speech.speak('The second reply.');
+    return first;
+  });
+  assert.ok(settled, 'an interrupted utterance must not strand its promise');
+  await page.close();
+});
+
 test('core directives run without error', async () => {
   const { page, errors } = await openDashboard(browser, { url: URL });
   for (const directive of ['help', 'status', 'keys', 'clear']) {
