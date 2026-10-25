@@ -14,6 +14,9 @@ jobs:
   dashboard:
     name: Dashboard — build and test
     runs-on: ubuntu-latest
+    # Without this a hung test burns the 360-minute default before anyone sees
+    # a red tick. The suite runs in about ninety seconds.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +41,7 @@ jobs:
   forge:
     name: forge — pipeline tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: forge/pipeline
