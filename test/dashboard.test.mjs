@@ -1,4 +1,10 @@
-import test, { before, after } from 'node:test';
+import nodeTest, { before, after } from 'node:test';
+
+// The hang guard belongs on each test, not on the run. `--test-timeout` also
+// times the file as a whole, and this file runs past two minutes, so a global
+// limit cancelled a suite in which every test had passed. A hung test still
+// fails here in a minute, with its own name.
+const test = (name, fn) => nodeTest(name, { timeout: 60_000 }, fn);
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { launch, openDashboard, brightness, waitForLog } from './browser.mjs';
