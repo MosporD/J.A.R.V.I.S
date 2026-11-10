@@ -9,9 +9,9 @@
     "build": "vite build",
     "preview": "vite preview --port 4173",
     "pretest": "vite build",
-    "test": "node --test --test-concurrency=1 test/gesture-detector.test.mjs test/dashboard.test.mjs",
+    "test": "node --test --test-concurrency=1 --test-timeout=120000 test/gesture-detector.test.mjs test/dashboard.test.mjs",
     "test:unit": "node --test test/gesture-detector.test.mjs",
-    "test:browser": "node --test --test-concurrency=1 test/dashboard.test.mjs"
+    "test:browser": "node --test --test-concurrency=1 --test-timeout=120000 test/dashboard.test.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

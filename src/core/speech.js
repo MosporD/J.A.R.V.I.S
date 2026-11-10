@@ -41,6 +41,7 @@ class Speech {
     this._stopTicker = null;
     this._queue = [];
     this._draining = false;
+    this._finish = null;
 
     if (this.synth) {
       const pick = () => this.pickVoice();
@@ -135,6 +136,7 @@ class Speech {
         settled = true;
         clearTimeout(this._floor);
         this._floor = null;
+        this._finish = null;
         this.speaking = false;
         this.target = 0;
         bus.emit('speech:end', { text: clean });
@@ -142,6 +144,9 @@ class Speech {
         resolve();
       };
 
+      // Held so `cancel` can settle this utterance rather than only clearing
+      // its timer. Cleared inside `finish` so it can never fire twice.
+      this._finish = finish;
       this._floor = setTimeout(finish, estimate);
 
       if (!useVoice) return;
@@ -212,6 +217,19 @@ class Speech {
     });
   }
 
+  /**
+   * Stop speaking, and settle whatever was in flight.
+   *
+   * The floor timer is the pending promise's only resolver on a machine with
+   * no installed voices — a CI runner, or any browser whose synthesiser never
+   * fires `onend`. Clearing that timer without finishing left the promise
+   * pending for good, and `respond()` is awaited by `execute()`, so a cancel
+   * mid-sentence hung the directive that started it: the interface stayed in
+   * PROCESSING and anything awaiting it waited forever.
+   *
+   * Reachable from the VOX toggle, the `voice` directive, both narration
+   * watchers, and every interrupting `speak()` — so it has to settle.
+   */
   cancel({ clearQueue = false } = {}) {
     if (clearQueue) this._queue.length = 0;
     clearTimeout(this._floor);
@@ -220,6 +238,8 @@ class Speech {
     this.speaking = false;
     this.target = 0;
     if (store.get('mode') === MODE.SPEAKING) store.set('mode', MODE.IDLE);
+    // Last: `finish` emits speech:end and resolves the awaiting caller.
+    this._finish?.();
   }
 }
 
