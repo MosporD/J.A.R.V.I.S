@@ -2,6 +2,7 @@ import { bus } from './bus.js';
 import { store, MODE } from './store.js';
 import { telemetry } from './telemetry.js';
 import { ENDPOINT } from './forge.js';
+import { contextSummary } from './finance.js';
 import {
   catalogue, execute, register, setFallback, log, respond,
 } from './commands.js';
@@ -41,8 +42,11 @@ const TIMEOUT_MS = 60000;
  * schema would be a second definition of the same verbs, and the two would
  * drift the first time someone added an argument.
  */
-export function toolsFromRegistry() {
-  return catalogue().map((command) => ({
+export function toolsFromRegistry({ includePrivate = false } = {}) {
+  // Directives marked `private` (the finance book) are offered only to a model
+  // running on this machine. Their output goes back to the model as a tool
+  // result, so offering them to a hosted one would be sending it your balances.
+  return catalogue().filter((command) => includePrivate || !command.private).map((command) => ({
     name: command.name,
     description: command.summary,
     parameters: {
@@ -61,7 +65,7 @@ export function toolsFromRegistry() {
 }
 
 /** What the dashboard currently knows, folded small enough to send every turn. */
-function snapshot() {
+function snapshot({ includePrivate = false } = {}) {
   const state = store.get();
   const readings = {};
   for (const [key, reading] of Object.entries(telemetry.snapshot() || {})) {
@@ -73,6 +77,7 @@ function snapshot() {
     reactor: state.reactor,
     online: state.online,
     telemetry: readings,
+    ...(includePrivate ? { finance: contextSummary() } : {}),
   };
 }
 
@@ -130,7 +135,11 @@ export class Brain {
     const response = await fetch(`${ENDPOINT}/brain`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ messages, tools: toolsFromRegistry(), context: snapshot() }),
+      body: JSON.stringify({
+        messages,
+        tools: toolsFromRegistry({ includePrivate: this.local }),
+        context: snapshot({ includePrivate: this.local }),
+      }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (response.status === 503) {
@@ -183,7 +192,9 @@ export class Brain {
         });
 
         for (const call of calls) {
-          const known = catalogue().some((command) => command.name === call.name);
+          const known = catalogue().some(
+            (command) => command.name === call.name && (this.local || !command.private),
+          );
           let output;
           if (call._error) {
             output = `Your arguments were not valid JSON. Try again: ${call._error}`;

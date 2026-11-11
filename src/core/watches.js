@@ -70,6 +70,18 @@ const DEFAULTS = [
     severity: 'alert',
     advice: 'Network is down. Anything fetched from here will fail until it returns.',
   },
+  // Money you entered yourself is measured, so this one can wake you.
+  {
+    id: 'debt-due-soon',
+    label: 'DEBT PAYMENT DUE SOON',
+    signal: 'money:due',
+    op: 'below',
+    value: 4,
+    for: 0,
+    cooldown: 86400,
+    severity: 'warn',
+    advice: 'A debt payment is due within three days. `debt` shows which.',
+  },
   // Simulated channels. Kept so the watch list is populated and the mechanism
   // is visible, but they are marked as invented wherever they surface.
   {

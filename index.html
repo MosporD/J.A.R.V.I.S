@@ -276,6 +276,17 @@
             <div class="panel-body flex flex-1 flex-col" id="diagnostics"></div>
           </section>
 
+          <section class="panel panel-bracket shrink-0" id="money" aria-labelledby="money-title">
+            <div class="panel-head">
+              <span class="led" data-tone="ok"></span>
+              <h2 class="panel-title" id="money-title">Finances</h2>
+              <button class="btn-hud ml-auto" type="button" data-money-import title="Import a bank CSV or a Jarvis backup">IMPORT</button>
+              <span class="panel-index ml-1" data-money-month>——</span>
+            </div>
+            <div class="panel-body space-y-2" data-money-body></div>
+            <input type="file" class="sr-hud" data-money-file accept=".csv,.json,.txt,text/csv,application/json" tabindex="-1" aria-label="Import statement" />
+          </section>
+
           <section class="panel panel-bracket shrink-0" id="metrics" aria-labelledby="metrics-title">
             <div class="panel-head">
               <span class="led" data-tone="ok"></span>
