@@ -573,3 +573,11 @@ test('finance directives are offered to a local model and withheld from a hosted
   assert.match(tool.content, /There is no directive called "money"/);
   await hosted.page.close();
 });
+
+test('a radar with no room to draw is skipped rather than throwing every frame', async () => {
+  const { page, errors } = await openDashboard(browser, { url: URL });
+  await page.addStyleTag({ content: '#worldclock canvas { width: 12px !important; height: 12px !important; }' });
+  await page.waitForTimeout(600);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
