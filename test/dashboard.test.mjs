@@ -56,7 +56,7 @@ after(async () => {
  * tool, then answer". Every posted transcript is recorded, which is how the
  * tool-result round trip is checked.
  */
-async function stubBrain(page, replies, { status = 200, ready = true } = {}) {
+async function stubBrain(page, replies, { status = 200, ready = true, local = true } = {}) {
   const posted = [];
   const queue = [...replies];
   await page.route('**/brain', async (route) => {
@@ -65,7 +65,7 @@ async function stubBrain(page, replies, { status = 200, ready = true } = {}) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ready, provider: 'ollama', model: 'qwen2.5:7b-instruct', local: true }),
+        body: JSON.stringify({ ready, provider: 'ollama', model: 'qwen2.5:7b-instruct', local }),
       });
     }
     posted.push(request.postDataJSON());
@@ -438,4 +438,138 @@ test('several directives in a row all complete', async () => {
   });
   assert.equal(finished, true);
   await page.close();
+});
+
+
+// --- finances ---------------------------------------------------------------
+
+const run = (page, line) => page.evaluate((l) => window.JARVIS.execute(l), line);
+
+test('spending, income and budgets show in the log and the Finances panel', async () => {
+  const { page, errors } = await openDashboard(browser, { url: URL });
+  await run(page, 'earn 1500 salary');
+  await run(page, 'budget groceries 115');
+  await run(page, 'spend 60.5 groceries at carrefour');
+  await run(page, 'spend 49.5 groceries');          // 110 of 115: still inside
+  await run(page, 'spend 10 fuel');
+  await run(page, 'money');
+  await waitForLog(page, /NET/);
+
+  const panel = await page.locator('#money').innerText();
+  assert.match(panel, /1,500 JOD/, 'income');
+  assert.match(panel, /120 JOD/, 'out');
+  assert.match(panel, /\+1,380 JOD/, 'net');
+  assert.match(panel, /groceries/i, 'the budget row');
+
+  await run(page, 'spend 6 groceries');             // 116 of 115: over
+  await waitForLog(page, /Over budget on groceries/);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('money entries survive a reload, and undo removes the last one', async () => {
+  const { page } = await openDashboard(browser, { url: URL });
+  await run(page, 'spend 12 fuel');
+  await run(page, 'spend 8 coffee');
+  await run(page, 'money undo');
+  await waitForLog(page, /Removed: spend 8 JOD coffee/);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Boolean(window.JARVIS));
+  const remaining = await page.evaluate(
+    () => window.JARVIS.finance.transactions().map((t) => [t.category, t.amount]),
+  );
+  assert.deepEqual(remaining, [['fuel', 12]]);
+  await page.close();
+});
+
+test('a debt plan reports months, interest and the order it attacks debts in', async () => {
+  const { page, errors } = await openDashboard(browser, { url: URL });
+  await run(page, 'debt add card 3000 24 90 15');
+  await run(page, 'debt add car 9000 6 250 1');
+  await run(page, 'debt plan 200');
+  await waitForLog(page, /PAYOFF PLAN — AVALANCHE/);
+  const log = await page.locator('[data-log-stream]').innerText();
+  assert.match(log, /Order: card → car/, 'highest rate first');
+  assert.match(log, /Debt-free in:/);
+  assert.match(log, /snowball/);
+  assert.match(log, /minimums only/);
+
+  await run(page, 'debt pay card 500');
+  await waitForLog(page, /Remaining 2,500 JOD/);
+  assert.match(await page.locator('#money').innerText(), /DEBT/);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('an unreachable payoff is reported instead of promised', async () => {
+  const { page } = await openDashboard(browser, { url: URL });
+  await run(page, 'debt add trap 10000 36 100');
+  await run(page, 'debt plan');
+  await waitForLog(page, /never — payments do not outrun interest on trap/);
+  await page.close();
+});
+
+test('a debt due within three days raises the sentinel alert, and paying clears it', async () => {
+  const { page } = await openDashboard(browser, { url: URL });
+  const day = new Date().getDate();
+  await run(page, `debt add card 1000 20 50 ${day}`);
+  assert.equal(await page.evaluate(() => window.JARVIS.finance.nextDueDays()), 0);
+  assert.equal(
+    await page.evaluate(() => window.JARVIS.signals.read('money:due')), 0,
+    'the sentinel reads the same number',
+  );
+  await run(page, 'debt pay card 50');
+  assert.equal(await page.evaluate(() => window.JARVIS.finance.nextDueDays()), null,
+    'a paid minimum settles the month');
+  await page.close();
+});
+
+test('importing a bank CSV adds rows once and says what it skipped', async () => {
+  const { page } = await openDashboard(browser, { url: URL });
+  const csv = 'Date,Description,Amount\n03/11/2026,CARREFOUR,-45.25\n04/11/2026,Salary,1500\nbad,row,1\n';
+  const first = await page.evaluate((text) => window.JARVIS.finance.importText(text, 's.csv'), csv);
+  assert.equal(first.ok, true);
+  assert.match(first.message, /Imported 2 transactions, 0 already present\. 1 row could not be read/);
+  const again = await page.evaluate((text) => window.JARVIS.finance.importText(text, 's.csv'), csv);
+  assert.match(again.message, /Imported 0 transactions, 2 already present/);
+  const bad = await page.evaluate(() => window.JARVIS.finance.importText('foo,bar\n1,2', 'x.csv'));
+  assert.equal(bad.ok, false);
+  await page.close();
+});
+
+test('a merchant name from an imported file cannot inject markup into the panel', async () => {
+  const { page, errors } = await openDashboard(browser, { url: URL });
+  await run(page, 'debt add "<img src=x onerror=window.__pwned=1>" 100 5 10');
+  await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(() => window.__pwned), undefined);
+  assert.equal(await page.locator('#money img').count(), 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('finance directives are offered to a local model and withheld from a hosted one', async () => {
+  const local = await openDashboard(browser, { url: URL });
+  const postedLocal = await stubBrain(local.page, [{ reply: 'ok', tool_calls: [] }], { local: true });
+  await run(local.page, 'spend 5 coffee');
+  await local.page.evaluate(() => window.JARVIS.brain.ask('how am I doing?'));
+  assert.ok(postedLocal[0].tools.some((t) => t.name === 'money'), 'local model gets the money tool');
+  assert.equal(postedLocal[0].context.finance.spent, 5, 'and a one-line summary of the month');
+  await local.page.close();
+
+  const hosted = await openDashboard(browser, { url: URL });
+  const postedHosted = await stubBrain(hosted.page, [
+    { reply: '', tool_calls: [{ id: 'c1', name: 'money', arguments: { arguments: '' } }] },
+    { reply: 'done', tool_calls: [] },
+  ], { local: false });
+  await run(hosted.page, 'spend 5 coffee');
+  await hosted.page.evaluate(() => window.JARVIS.brain.ask('how am I doing?'));
+  const offered = postedHosted[0].tools.map((t) => t.name);
+  for (const name of ['money', 'spend', 'earn', 'debt', 'budget']) {
+    assert.ok(!offered.includes(name), `${name} must not be offered to a hosted model`);
+  }
+  assert.equal(postedHosted[0].context.finance, undefined, 'no summary either');
+  // Even if the model asks for one anyway, nothing runs and no balance goes back.
+  const tool = postedHosted[1].messages.find((m) => m.role === 'tool');
+  assert.match(tool.content, /There is no directive called "money"/);
+  await hosted.page.close();
 });

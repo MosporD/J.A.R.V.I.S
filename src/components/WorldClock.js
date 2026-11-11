@@ -146,6 +146,9 @@ export class WorldClock extends Component {
     const cx = w / 2;
     const cy = h / 2;
     const R = Math.min(w, h) / 2 - 10;
+    // A canvas that has not been laid out yet (or is collapsed) leaves no room
+    // for the rings, and a negative radius makes arc() throw every frame.
+    if (R < 4) return;
     const key = palette.hud;
 
     this.sweep = (this.sweep + dt * 0.85) % (Math.PI * 2);

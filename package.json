@@ -9,8 +9,8 @@
     "build": "vite build",
     "preview": "vite preview --port 4173",
     "pretest": "vite build",
-    "test": "node --test --test-concurrency=1 test/gesture-detector.test.mjs test/dashboard.test.mjs",
-    "test:unit": "node --test test/gesture-detector.test.mjs",
+    "test": "node --test --test-concurrency=1 test/gesture-detector.test.mjs test/finance-math.test.mjs test/dashboard.test.mjs",
+    "test:unit": "node --test test/gesture-detector.test.mjs test/finance-math.test.mjs",
     "test:browser": "node --test --test-concurrency=1 test/dashboard.test.mjs"
   },
   "devDependencies": {

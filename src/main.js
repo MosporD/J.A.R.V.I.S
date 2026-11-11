@@ -39,6 +39,9 @@ import { ListenToggle } from './components/ListenToggle.js';
 import { GestureToggle } from './components/GestureToggle.js';
 import { CastPanel } from './components/CastPanel.js';
 import { MetricsPanel } from './components/MetricsPanel.js';
+import { MoneyPanel } from './components/MoneyPanel.js';
+import * as finance from './core/finance.js';
+import { restoreFinance } from './core/finance.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -74,6 +77,7 @@ const dashboard = [
   new GestureToggle('#gesture-toggle'),
   new CommandBar('#command'),
   new MetricsPanel('#metrics'),
+  new MoneyPanel('#money'),
   new CastPanel('#cast'),
 ];
 
@@ -210,6 +214,7 @@ function start() {
   // Hand-tracked metrics are signals like any other, so they must be back in
   // the registry before the sentinel starts looking for them.
   step('Tracked metrics', () => restoreTracked());
+  step('Finance signals', () => restoreFinance());
   step('History', () => {
     startSignalRecorder();
     history.prune();
@@ -277,7 +282,7 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, gestures, brain, cast, sentinel, notifier, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, gestures, brain, cast, sentinel, notifier, finance, execute, dashboard };
   // Signal provenance is worth inspecting from the console: `JARVIS.signals.list()`
   // says which readings are real, and `register` lets a new feed be tried live.
   window.JARVIS.signals = { register: registerSignal, read: readSignal, list: signals };
