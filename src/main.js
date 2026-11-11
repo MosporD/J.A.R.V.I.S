@@ -8,7 +8,14 @@ import { execute } from './core/commands.js';
 import { startHotkeys, bindKey } from './core/hotkeys.js';
 import { dictation } from './core/dictation.js';
 import { gestures } from './core/gestures.js';
+import { brain } from './core/brain.js';
 import { cast } from './core/cast.js';
+import { registerSignal, readSignal, signals, startSignalRecorder } from './core/signals.js';
+import { history } from './core/history.js';
+import { restoreTracked } from './core/track.js';
+import { sentinel } from './core/sentinel.js';
+import { installDefaultWatches } from './core/watches.js';
+import { notifier } from './core/notify.js';
 import { speech } from './core/speech.js';
 import { forge } from './core/forge.js';
 import { narrator } from './core/narrator.js';
@@ -31,6 +38,7 @@ import { NarrateToggle } from './components/NarrateToggle.js';
 import { ListenToggle } from './components/ListenToggle.js';
 import { GestureToggle } from './components/GestureToggle.js';
 import { CastPanel } from './components/CastPanel.js';
+import { MetricsPanel } from './components/MetricsPanel.js';
 import { BootSequence } from './components/BootSequence.js';
 
 /**
@@ -65,6 +73,7 @@ const dashboard = [
   new ListenToggle('#listen-toggle'),
   new GestureToggle('#gesture-toggle'),
   new CommandBar('#command'),
+  new MetricsPanel('#metrics'),
   new CastPanel('#cast'),
 ];
 
@@ -196,6 +205,20 @@ function start() {
   // These run before any panel mounts, so an exception in one of them used to
   // mean nothing mounted at all — boot overlay included.
   step('Telemetry', () => telemetry.start());
+  // The sentinel reasons over signals the sampler produces, so it starts after
+  // it — and owns alerting and threat posture from here on.
+  // Hand-tracked metrics are signals like any other, so they must be back in
+  // the registry before the sentinel starts looking for them.
+  step('Tracked metrics', () => restoreTracked());
+  step('History', () => {
+    startSignalRecorder();
+    history.prune();
+  });
+  step('Sentinel', () => {
+    installDefaultWatches();
+    sentinel.start();
+  });
+  step('Notifications', () => notifier.start());
   // Optional by design: the workshop runs whether or not the pipeline is up,
   // so this backs off quietly instead of retrying a dead port forever.
   step('Forge pipeline', () => forge.start());
@@ -207,9 +230,24 @@ function start() {
     bindKey('v', 'Spoken directives on or off', () => dictation.toggle());
     bindKey('g', 'Gesture directives on or off', () => gestures.toggle());
     bindKey('p', 'Cast the dashboard elsewhere', 'cast');
+    bindKey('w', 'List the sentinel watches', 'watch');
+    bindKey('n', 'What happened while you were away', 'brief');
     startHotkeys();
   });
   step('Motion preference', () => store.set('reduceMotion', prefersReducedMotion));
+  // Ask once whether there is a model to reason with. Never blocking: the
+  // prompt works without one, it just falls back to matching verbs.
+  step('Reasoning layer', () => {
+    brain.probe().then((ready) => {
+      if (ready) {
+        bus.emit('log', {
+          level: 'ok',
+          tag: 'brain',
+          text: `Reasoning layer online — ${brain.model}${brain.local ? ', running locally' : ''}.`,
+        });
+      }
+    });
+  });
 
   dashboard.forEach(mountSafely);
   bindCoreFallback();
@@ -239,7 +277,11 @@ function start() {
   window.addEventListener('keydown', unlock, { once: true });
 
   // Expose the primitives for experimentation from the browser console.
-  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, gestures, cast, execute, dashboard };
+  window.JARVIS = { bus, store, telemetry, forge, narrator, audio, speech, dictation, gestures, brain, cast, sentinel, notifier, execute, dashboard };
+  // Signal provenance is worth inspecting from the console: `JARVIS.signals.list()`
+  // says which readings are real, and `register` lets a new feed be tried live.
+  window.JARVIS.signals = { register: registerSignal, read: readSignal, list: signals };
+  window.JARVIS.history = history;
 }
 
 if (document.readyState === 'loading') {

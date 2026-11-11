@@ -15,12 +15,16 @@
 
 	# The API is the one surface a J.A.R.V.I.S panel needs. Read-only endpoints
 	# only — the stage endpoints stay inside the network.
+	# Caddy refuses an upstream with a path in it, so the prefix is rewritten
+	# away first and the upstream is a bare host:port.
 	handle /api/health {
-		reverse_proxy forge-api:8000/health
+		rewrite * /health
+		reverse_proxy forge-api:8000
 	}
 
 	handle /api/pipeline {
-		reverse_proxy forge-api:8000/pipeline
+		rewrite * /pipeline
+		reverse_proxy forge-api:8000
 	}
 
 	handle {

@@ -15,7 +15,7 @@ import { register, respond, log } from './commands.js';
  *   forge:link   { online, endpoint, error }    — transitions only
  */
 
-const ENDPOINT = (import.meta.env?.VITE_FORGE_API || 'http://localhost:8000').replace(/\/$/, '');
+export const ENDPOINT = (import.meta.env?.VITE_FORGE_API || 'http://localhost:8000').replace(/\/$/, '');
 
 const POLL_MS = 10000;
 const TIMEOUT_MS = 4000;
